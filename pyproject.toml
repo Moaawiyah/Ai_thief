@@ -1,0 +1,51 @@
+[project]
+name = "police-thief"
+version = "0.1.0"
+description = "Distributed Police-vs-Thief P2P agent (FastMCP, Dec-POMDP, commit-reveal)"
+readme = "README.md"
+authors = [
+    { name = "moaawiyahhaj", email = "moaawiyah.haj@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastmcp>=3.4.5",
+]
+
+[project.scripts]
+police-thief = "police_thief:main"
+
+[build-system]
+requires = ["uv_build>=0.11.10,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/__main__.py",
+    "*/gui/*",
+    "*/infra/mcp_server.py",
+    "*/infra/mcp_client.py",
+]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true

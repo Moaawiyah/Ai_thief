@@ -1,0 +1,36 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Test / lint artifacts
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Private per-peer config (never shared, may contain identifying info/credentials)
+config/police/game.toml
+config/thief/game.toml
+config/police/*.local.toml
+config/thief/*.local.toml
+
+# Secrets / credentials
+.env
+*.credentials.json
+*token*.json
+
+# OS / editor
+.DS_Store
+
+# Logs and replays
+logs/
+
+# Course spec PDF - copyrighted material, kept local-only
+police_thief_p2p.pdf
