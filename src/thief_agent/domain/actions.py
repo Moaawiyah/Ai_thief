@@ -1,22 +1,13 @@
-"""Action: one turn's chosen move, validated on construction.
-
-Bundling the move type with its direction keeps the shape rules in one place
-instead of re-checking them in every caller. The rules differ per action:
-
-* MOVE always needs a direction.
-* BARRIER takes an *optional* direction -- omitting it means "wall the cell I
-  stand on", the fifth placement the specification allows (3.4).
-* HOLD must not carry a direction at all.
-"""
+"""Thief actions: one turn's move or hold, validated on construction."""
 
 from dataclasses import dataclass
 
-from police_thief.constants import Direction, MoveType
+from thief_agent.constants import Direction, MoveType
 
 
 @dataclass(frozen=True)
 class Action:
-    """A peer's action for one turn. Frozen so a logged action cannot be edited."""
+    """A Thief action for one turn."""
 
     move_type: MoveType
     direction: Direction | None = None
@@ -34,11 +25,6 @@ class Action:
 def move(direction: Direction) -> Action:
     """Step one cell in `direction`."""
     return Action(MoveType.MOVE, direction)
-
-
-def barrier(direction: Direction | None = None) -> Action:
-    """Wall an adjacent cell, or the cell underfoot when `direction` is omitted."""
-    return Action(MoveType.BARRIER, direction)
 
 
 def hold() -> Action:

@@ -1,8 +1,6 @@
 """Thief peer entrypoint and repository identity."""
 
-from police_thief.constants import Role
-
-ROLE = Role.THIEF
+PEER_ROLE = "thief"
 
 
 def main() -> None:

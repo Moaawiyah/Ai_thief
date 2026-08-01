@@ -6,7 +6,7 @@ state elsewhere (see own_state.py) and passes the known barrier set in per call,
 which keeps the geometry trivially testable and free of hidden shared state.
 """
 
-from police_thief.constants import DELTAS, Cell, Direction
+from thief_agent.constants import DELTAS, Cell, Direction
 
 
 class Board:
@@ -46,15 +46,3 @@ class Board:
     ) -> list[tuple[Direction, Cell]]:
         """(direction, target) for every legal single step from `origin`."""
         return [(d, t) for d in Direction if (t := self.step(origin, d, barriers)) is not None]
-
-    def barrier_targets(self, origin: Cell, barriers: set[Cell] | None = None) -> list[Cell]:
-        """The cells the police may wall while standing on `origin`.
-
-        Specification 3.4: "the cell it stands on itself, or one of the four
-        orthogonally adjacent cells" -- five candidates, not four. Including the
-        origin is what allows the police to wall the thief's cell after stepping
-        onto it. Cells that are off-board or already walled are excluded.
-        """
-        walled = barriers or set()
-        here = [origin] if self.in_bounds(origin) and origin not in walled else []
-        return here + self.neighbors(origin, barriers)

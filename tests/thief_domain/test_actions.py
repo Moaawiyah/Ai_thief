@@ -1,9 +1,9 @@
-"""Tests for the Action value object and its shape rules."""
+"""Tests for the Thief Action value object and its shape rules."""
 
 import pytest
 
-from police_thief.constants import Direction, MoveType
-from police_thief.domain.actions import Action, barrier, hold, move
+from thief_agent.constants import Direction, MoveType
+from thief_agent.domain.actions import Action, hold, move
 
 
 class TestValidation:
@@ -15,11 +15,6 @@ class TestValidation:
         with pytest.raises(ValueError, match="must not carry a direction"):
             Action(MoveType.HOLD, Direction.N)
 
-    def test_barrier_direction_is_optional(self):
-        # No direction means "wall the cell I stand on" (specification 3.4).
-        assert Action(MoveType.BARRIER).direction is None
-        assert Action(MoveType.BARRIER, Direction.E).direction is Direction.E
-
     def test_actions_are_frozen(self):
         with pytest.raises(AttributeError):
             move(Direction.N).direction = Direction.S
@@ -28,11 +23,8 @@ class TestValidation:
 class TestConstructors:
     def test_helpers_build_the_expected_actions(self):
         assert move(Direction.N) == Action(MoveType.MOVE, Direction.N)
-        assert barrier(Direction.W) == Action(MoveType.BARRIER, Direction.W)
-        assert barrier() == Action(MoveType.BARRIER, None)
         assert hold() == Action(MoveType.HOLD, None)
 
     def test_string_form_is_loggable(self):
         assert str(move(Direction.S)) == "MOVE:S"
-        assert str(barrier()) == "BARRIER:-"
         assert str(hold()) == "HOLD:-"

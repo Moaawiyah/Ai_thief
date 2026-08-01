@@ -1,11 +1,10 @@
-import police_thief
-from police_thief import domain, infra, peer, shared
-from police_thief.constants import Role
+import thief_agent
+from thief_agent import domain, infra, peer, shared
 
 
 def test_package_importable():
-    assert police_thief is not None
-    assert police_thief.ROLE is Role.THIEF
+    assert thief_agent is not None
+    assert thief_agent.PEER_ROLE == "thief"
 
 
 def test_subpackages_importable():

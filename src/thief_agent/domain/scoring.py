@@ -6,8 +6,7 @@ config/*/game.json "scoring" block (specification Appendix Vav, table 17) rather
 than being hardcoded here, because the two peers negotiate that table.
 """
 
-from police_thief.constants import Role
-from police_thief.domain.rules import CAPTURE, SURVIVAL
+from thief_agent.domain.rules import CAPTURE, SURVIVAL
 
 # outcome -> (key for whoever played police, key for whoever played thief)
 _POINT_KEYS = {
@@ -28,7 +27,7 @@ def score_subgame(result: str, roles: dict[str, str], scoring: dict) -> dict[str
         return dict.fromkeys(roles, scoring.get("technical_loss", 0))
     cop_key, thief_key = _POINT_KEYS[result]
     return {
-        group: scoring[cop_key] if role == Role.POLICE else scoring[thief_key]
+        group: scoring[cop_key] if role == "police" else scoring[thief_key]
         for group, role in roles.items()
     }
 

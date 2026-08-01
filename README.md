@@ -15,15 +15,15 @@ from the shared rules and verify each other's moves cryptographically.
 Role-specific files belong to this repository:
 
 - `config/thief/game.toml.example` — Thief network, strategy, and local settings;
-- `src/police_thief/__init__.py` — identifies this package as the Thief peer;
+- `src/thief_agent/__init__.py` — identifies this package as the Thief peer;
 - future Thief strategy, orchestration, and runtime modules.
 
 The deterministic game vocabulary and rules remain shared so this peer stays
 wire-compatible with the Police repository:
 
 - `config/thief/game.json` — this repository's copy of the agreed game rules;
-- `src/police_thief/constants.py`;
-- `src/police_thief/domain/`;
+- `src/thief_agent/constants.py`;
+- `src/thief_agent/domain/`;
 - corresponding shared tests.
 
 When shared rules change, apply the same change to the Police repository and
@@ -38,7 +38,7 @@ the build order and [`TODO.md`](TODO.md) for the current step.
 ## Layout
 
 ```
-src/police_thief/
+src/thief_agent/
   domain/   shared game rules, board, movement, and scoring
   infra/    Thief-side FastMCP server/client, email, and LLM provider
   peer/     Thief orchestration, handshake, and turn handling
