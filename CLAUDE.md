@@ -2,16 +2,37 @@
 
 ## Project Overview
 
-This is a university final project implementing a distributed
-**Police vs. Thief (Cops-and-Robbers) game over a Peer-to-Peer network**.
+This is the **Thief** repository for a university final project implementing a
+distributed **Police vs. Thief (Cops-and-Robbers) game over a Peer-to-Peer
+network**. The Police peer is maintained separately at:
 
-The system consists of two independent agents:
+https://github.com/Moaawiyah/police-agent
+
+The system consists of two independent agents maintained in separate repos:
 
 - Police
 - Thief
 
-Each agent runs as an independent process and eventually communicates
-directly with the other peer.
+This repository runs the Thief process. It eventually communicates directly
+with the Police peer.
+
+## Repository boundary
+
+Keep the following files compatible with the Police repository:
+
+- `config/thief/game.json` — the Thief copy of the agreed shared rules file;
+- `src/police_thief/constants.py`;
+- `src/police_thief/domain/`;
+- tests covering the shared domain behavior.
+
+Keep Thief-only configuration and behavior in this repository:
+
+- `config/thief/game.toml.example`;
+- the package entrypoint and Thief strategy;
+- Thief peer orchestration, networking, reporting, and tests specific to them.
+
+Do not reintroduce a `config/police/` directory here. When a shared file
+changes, port the same change to the Police repository and verify both peers.
 
 The project includes several major areas:
 

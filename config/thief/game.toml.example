@@ -5,14 +5,14 @@ group_name = "My-Team"
 group_id   = "my-team"
 sub_game_number = 1
 members = ["id-1001", "id-1002"]
-repos = { cop = "https://github.com/you/repo", thief = "https://github.com/you/repo" }
+repos = { cop = "https://github.com/Moaawiyah/police-agent.git", thief = "https://github.com/Moaawiyah/Ai_thief.git" }
 
 [network]
 my_port         = 8802                             # MY MCP server port
 opponent_url    = "http://127.0.0.1:8801/mcp"       # the only thing I know about the opponent
 turn_timeout_seconds = 180
 
-# [strategy]  -- optional: point at YOUR brain subclass (else the shipped heuristic runs)
+# [strategy]  -- optional: point at YOUR thief brain subclass (else the shipped heuristic runs)
 # thief_class = "my_team.strategy:MyThiefBrain"
 
 # [trash_talk] -- optional: HOW the banter is produced. The MOVE is always pure Python.
