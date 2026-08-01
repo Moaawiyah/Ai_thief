@@ -1,12 +1,15 @@
-# TODO
+# Thief TODO
+
+This repository owns the Thief peer. Keep shared rule/config changes aligned
+with `https://github.com/Moaawiyah/police-agent.git`.
 
 ## Step 1 — Project setup (done)
 
 - [x] `uv init`, `pyproject.toml` deps (fastmcp, pytest, pytest-cov, ruff)
 - [x] Ruff / pytest / coverage config (85% fail-under)
 - [x] `src/police_thief/{domain,infra,peer,shared}` empty package skeleton
-- [x] `config/police/`, `config/thief/` separation with shared `game.json`
-      and private `game.toml.example`
+- [x] Thief-only `config/thief/` with shared `game.json` and private
+      `game.toml.example`
 - [x] Smoke test, `.gitignore`, README/PLAN/TODO stubs
 
 ## Step 2 — Core game/domain rules (done)
@@ -22,8 +25,8 @@
 - [x] `domain/scoring.py`: scoring table + series tie rule
 - [x] Tests: 61 passing, 99% coverage, zero Ruff violations
 
-## Step 3 — Local playable simulation (next)
+## Step 3 — Thief local playable simulation (next)
 
-- [ ] Read `config/*/game.json` into the domain layer (shared terms only)
-- [ ] Drive two `OwnGameState` peers through a turn loop in one process
-- [ ] Scripted/random move selection only — real strategy is step 7
+- [ ] Read `config/thief/game.json` into the domain layer (shared terms only)
+- [ ] Drive the Thief `OwnGameState` against a local test double in one process
+- [ ] Scripted/random Thief move selection only — real strategy is step 7
