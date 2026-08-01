@@ -7,21 +7,21 @@ with `https://github.com/Moaawiyah/police-agent.git`.
 
 - [x] `uv init`, `pyproject.toml` deps (fastmcp, pytest, pytest-cov, ruff)
 - [x] Ruff / pytest / coverage config (85% fail-under)
-- [x] `src/police_thief/{domain,infra,peer,shared}` empty package skeleton
+- [x] `src/thief_agent/{domain,infra,peer,shared}` package skeleton
 - [x] Thief-only `config/thief/` with shared `game.json` and private
       `game.toml.example`
 - [x] Smoke test, `.gitignore`, README/PLAN/TODO stubs
 
 ## Step 2 — Core game/domain rules (done)
 
-- [x] `constants.py`: `Role`, `MoveType`, `Direction` (N/S/E/W only), `DELTAS`
-- [x] `domain/board.py`: bounds, orthogonal steps, `legal_moves`,
-      `barrier_targets` (own cell + 4 neighbours, per spec 3.4)
-- [x] `domain/actions.py`: validated `Action` value object
-- [x] `domain/own_state.py`: per-peer state, `apply_move`, barrier quota,
-      `is_confined`
-- [x] `domain/rules.py`: survival threshold, capture claim, `barrier_captures`
-      (Appendix ה #46), `confinement_capture` (Appendix ה #47)
+- [x] `constants.py`: Thief `MoveType`, `Direction` (N/S/E/W only), `DELTAS`
+- [x] `domain/board.py`: bounds, orthogonal steps, `legal_moves`, and
+      observed-barrier blocking
+- [x] `domain/actions.py`: validated Thief `Action` value object
+- [x] `domain/own_state.py`: Thief position, movement history, and observed
+      barriers; no Police-owned barrier placement
+- [x] `domain/rules.py`: Thief survival, capture claims, barrier capture
+      (Appendix ה #46), and confinement capture (Appendix ה #47)
 - [x] `domain/scoring.py`: scoring table + series tie rule
 - [x] Tests: 61 passing, 99% coverage, zero Ruff violations
 

@@ -1,4 +1,4 @@
-"""Immutable game vocabulary: roles, action types and the legal directions.
+"""Immutable Thief action vocabulary and legal movement directions.
 
 These are physics, not configuration. The specification (Appendix Vav, table 15)
 marks the move set as *fixed*: a single orthogonal step or staying put, with
@@ -13,18 +13,10 @@ from enum import StrEnum
 Cell = tuple[int, int]
 
 
-class Role(StrEnum):
-    """Which side a peer plays. Roles alternate across a series of sub-games."""
-
-    POLICE = "police"
-    THIEF = "thief"
-
-
 class MoveType(StrEnum):
-    """The actions a peer may take on its turn."""
+    """The actions this Thief peer may take on its turn."""
 
     MOVE = "MOVE"  # step one cell orthogonally
-    BARRIER = "BARRIER"  # police only: forgo the step and wall a cell instead
     HOLD = "HOLD"  # stay put
 
 

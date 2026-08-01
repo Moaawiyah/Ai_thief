@@ -2,8 +2,8 @@
 
 import pytest
 
-from police_thief.constants import Direction
-from police_thief.domain.board import Board
+from thief_agent.constants import Direction
+from thief_agent.domain.board import Board
 
 
 class TestGeometry:
@@ -47,25 +47,10 @@ class TestNoDiagonals:
         assert sorted(Board(size=7).neighbors((0, 0))) == [(0, 1), (1, 0)]
 
 
-class TestBarriers:
+class TestObservedBarriers:
     def test_barrier_blocks_a_step(self):
         assert Board(size=7).step((3, 3), Direction.N, barriers={(2, 3)}) is None
 
     def test_legal_moves_exclude_barriers(self):
         moves = Board(size=7).legal_moves((0, 0), barriers={(0, 1)})
         assert [cell for _, cell in moves] == [(1, 0)]
-
-    def test_barrier_targets_include_the_cell_underfoot(self):
-        # Specification 3.4: own cell plus four neighbours = five candidates.
-        targets = Board(size=7).barrier_targets((3, 3))
-        assert (3, 3) in targets
-        assert len(targets) == 5
-
-    def test_barrier_targets_exclude_off_board_and_walled_cells(self):
-        targets = Board(size=7).barrier_targets((0, 0), barriers={(0, 1)})
-        assert targets == [(0, 0), (1, 0)]
-
-    def test_barrier_targets_exclude_own_cell_when_already_walled(self):
-        targets = Board(size=7).barrier_targets((3, 3), barriers={(3, 3)})
-        assert (3, 3) not in targets
-        assert len(targets) == 4

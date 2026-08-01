@@ -21,14 +21,14 @@ with the Police peer.
 Keep the following files compatible with the Police repository:
 
 - `config/thief/game.json` — the Thief copy of the agreed shared rules file;
-- `src/police_thief/constants.py`;
-- `src/police_thief/domain/`;
+- `src/thief_agent/constants.py`;
+- `src/thief_agent/domain/`;
 - tests covering the shared domain behavior.
 
 Keep Thief-only configuration and behavior in this repository:
 
 - `config/thief/game.toml.example`;
-- the package entrypoint and Thief strategy;
+- the `thief_agent` package entrypoint and Thief strategy;
 - Thief peer orchestration, networking, reporting, and tests specific to them.
 
 Do not reintroduce a `config/police/` directory here. When a shared file
