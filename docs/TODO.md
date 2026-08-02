@@ -25,18 +25,28 @@ with `https://github.com/Moaawiyah/police-agent.git`.
 - [x] `domain/scoring.py`: scoring table + series tie rule
 - [x] Tests: 61 passing, 99% coverage, zero Ruff violations
 
-## Step 3 — Thief local playable simulation (next)
+## Step 3 — Thief local playable simulation (done)
 
 - [x] Adopt the reference-style pure-Python `ThiefBrain` with legal-move and
       unvisited-cell selection
 - [x] Add a Thief-side belief grid for the unseen Police position
-- [ ] Read `config/thief/game.json` into the domain layer (shared terms only)
-- [ ] Drive the Thief `OwnGameState` against a local test double in one process
-- [ ] Scripted/random Thief move selection only — real strategy is step 7
+- [x] Read `config/thief/game.json` into the runtime configuration layer
+- [x] Drive the Thief `OwnGameState` against a deterministic Police test double
+- [x] Scripted/random Thief move selection only — real strategy is step 7
 
-## Step 4 — FastMCP transport (in progress)
+## Step 4 — FastMCP transport and one-game runtime (done)
 
 - [x] Start an independent FastMCP HTTP mailbox for the Thief peer
 - [x] Send and poll agreements, turns, and audit payloads through the opponent URL
 - [x] Verify a real two-port FastMCP round trip
-- [ ] Add the signed peer handshake and turn orchestration
+- [x] Add the signed peer handshake and turn orchestration
+- [x] Add validated turn/audit/control wire models
+- [x] Add SHA-256 commit-reveal sealing and audit verification
+- [x] Add `thief-agent server` and `thief-agent play` subcommands
+- [x] Verify a complete one-game exchange over real FastMCP HTTP
+
+## Step 5 — Follow-up
+
+- [ ] Add full pheromone emission/decay and belief fusion
+- [ ] Add multi-game series aggregation and role alternation
+- [ ] Add reporting artifacts, replay, and GUI integration
