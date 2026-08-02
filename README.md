@@ -16,7 +16,8 @@ Role-specific files belong to this repository:
 
 - `config/thief/game.toml.example` — Thief network, strategy, and local settings;
 - `src/thief_agent/__init__.py` — identifies this package as the Thief peer;
-- future Thief strategy, orchestration, and runtime modules.
+- `src/thief_agent/strategy/` — Thief belief and move policy;
+- `src/thief_agent/peer/` — handshake, runtime, and turn orchestration.
 
 The deterministic game vocabulary and rules remain shared so this peer stays
 wire-compatible with the Police repository:
@@ -31,10 +32,11 @@ run both repositories' test suites.
 
 ## Status
 
-Project setup, deterministic domain rules, the reference-style `ThiefBrain`, and
-the basic FastMCP mailbox transport are implemented. Peer handshake, security,
-and reporting remain. See [`PLAN.md`](PLAN.md) for the build order and
-[`TODO.md`](TODO.md) for the current step.
+The one-sub-game Thief runtime, reference-compatible protocol, handshake,
+commit-reveal audit, configuration loader, and FastMCP transport are implemented.
+Series aggregation, reporting, GUI, and full pheromone mechanics remain.
+See [`PLAN.md`](PLAN.md) for the build order and [`TODO.md`](TODO.md) for the
+current step.
 
 ## Layout
 
@@ -53,7 +55,10 @@ tests/      shared domain tests and Thief-specific tests
 
 ```
 uv sync
-uv run thief-agent
+cp config/thief/game.toml.example config/thief/game.toml
+uv run thief-agent play --config-dir config/thief
+# mailbox-only mode (debugging/interop tools)
+uv run thief-agent server --port 8802
 uv run pytest
 uv run ruff check .
 ```
