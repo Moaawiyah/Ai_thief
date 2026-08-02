@@ -31,9 +31,10 @@ run both repositories' test suites.
 
 ## Status
 
-Project setup and deterministic domain rules are implemented. Thief networking,
-strategy, and reporting are not implemented yet. See [`PLAN.md`](PLAN.md) for
-the build order and [`TODO.md`](TODO.md) for the current step.
+Project setup, deterministic domain rules, the reference-style `ThiefBrain`, and
+the basic FastMCP mailbox transport are implemented. Peer handshake, security,
+and reporting remain. See [`PLAN.md`](PLAN.md) for the build order and
+[`TODO.md`](TODO.md) for the current step.
 
 ## Layout
 
