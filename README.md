@@ -33,8 +33,9 @@ run both repositories' test suites.
 ## Status
 
 The one-sub-game Thief runtime, reference-compatible protocol, handshake,
-commit-reveal audit, configuration loader, and FastMCP transport are implemented.
-Series aggregation, reporting, GUI, and full pheromone mechanics remain.
+commit-reveal audit, configuration loader, FastMCP transport, full pheromone
+mechanics, Bayesian belief fusion, and public SDK are implemented.
+Series aggregation, reporting, and GUI remain.
 See [`PLAN.md`](PLAN.md) for the build order and [`TODO.md`](TODO.md) for the
 current step.
 
@@ -45,6 +46,7 @@ src/thief_agent/
   domain/   shared game rules, board, movement, and scoring
   infra/    Thief-side FastMCP server/client, email, and LLM provider
   peer/     Thief orchestration, handshake, and turn handling
+  sdk/      lazy public composition root for callers and front ends
   shared/   shared config loading and rate limiting
 config/
   thief/    Thief's private config + its copy of the shared game.json

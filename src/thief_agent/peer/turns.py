@@ -29,13 +29,19 @@ def seal_step(state, action: Action, decision) -> dict:
     return {"payload": payload, **CommitReveal.seal(payload)}
 
 
-def turn_message(record: dict, hint: str, claim_response: dict | None, win: bool) -> dict:
+def turn_message(
+    record: dict,
+    hint: str,
+    claim_response: dict | None,
+    win: bool,
+    smell_grid: dict | None = None,
+) -> dict:
     """Build the public Thief message for one sealed step."""
     message = TurnMessage(
         step=record["payload"]["step"],
         sender="thief",
         hint=hint,
-        smell_grid={},
+        smell_grid=smell_grid or {},
         commit=record["commit"],
         timestamp=datetime.now(UTC).isoformat(),
         claim_response=claim_response,

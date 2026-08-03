@@ -52,6 +52,8 @@ def _shared_overlay(shared: dict) -> dict:
         },
         "network": {
             "turn_timeout_seconds": network.get("response_timeout_sec", 30),
+            "response_timeout_seconds": network.get("response_timeout_sec", 30),
+            "watchdog_timeout_seconds": network.get("watchdog_timeout_sec", 60),
         },
         "game": {"num_games": network.get("num_games", 1)},
         "scoring": shared.get("scoring", {}),
@@ -100,6 +102,13 @@ class ConfigManager:
                 return default
             node = node[part]
         return node
+
+    def require(self, dotted_key: str) -> Any:
+        """Return a required setting or raise an error naming its dotted key."""
+        value = self.get(dotted_key)
+        if value is None:
+            raise ConfigError(f"Missing required config key {dotted_key!r}")
+        return value
 
     def override(self, dotted_key: str, value: Any) -> None:
         parts = dotted_key.split(".")

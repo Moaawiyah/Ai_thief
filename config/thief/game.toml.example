@@ -2,7 +2,7 @@ version = "1.10"
 
 [game]
 group_name = "My-Team"
-group_id   = "my-team"
+group_id = "thief-team"
 sub_game_number = 1
 members = ["id-1001", "id-1002"]
 repos = { cop = "https://github.com/Moaawiyah/police-agent.git", thief = "https://github.com/Moaawiyah/Ai_thief.git" }
@@ -11,6 +11,11 @@ repos = { cop = "https://github.com/Moaawiyah/police-agent.git", thief = "https:
 my_port         = 8802                             # MY MCP server port
 opponent_url    = "http://127.0.0.1:8801/mcp"       # the only thing I know about the opponent
 turn_timeout_seconds = 180
+
+[belief]
+# Private confidence in scent evidence. Physical scent constants remain signed
+# shared terms in game.json; this is only the Thief's fusion tuning.
+smell_trust = 4.0
 
 # [strategy]  -- optional: point at YOUR thief brain subclass (else the shipped heuristic runs)
 # thief_class = "my_team.strategy:MyThiefBrain"
