@@ -1,5 +1,7 @@
 """One complete Thief sub-game against a remote Police peer."""
 
+import time
+
 from thief_agent.domain.actions import hold
 from thief_agent.domain.crypto import audit_records
 from thief_agent.domain.own_state import OwnGameState
@@ -8,6 +10,7 @@ from thief_agent.domain.rules import CAPTURE, SURVIVAL, TIMEOUT, GameRules
 from thief_agent.domain.scent import ScentField
 from thief_agent.infra.mcp_client import McpTransport
 from thief_agent.infra.mcp_server import start_peer_server
+from thief_agent.peer.controls import GameControls
 from thief_agent.peer.handshake import (
     Negotiation,
     identity_from_config,
@@ -15,13 +18,23 @@ from thief_agent.peer.handshake import (
     validate_config,
 )
 from thief_agent.peer.turns import seal_step, terminal_message, turn_message
+from thief_agent.peer.view import snapshot
 from thief_agent.strategy import BeliefGrid, ThiefBrain
+from thief_agent.strategy.talk import resolve_hint_writer
 
 
 class ThiefRuntime:
     """Own the Thief state and drive the turn token over MCP."""
 
-    def __init__(self, config, transport: McpTransport | None = None, brain=None):
+    def __init__(
+        self,
+        config,
+        transport: McpTransport | None = None,
+        brain=None,
+        hint_writer=None,
+        listener=None,
+        controls=None,
+    ):
         validate_config(config)
         self.config = config
         self.transport = transport or self._transport_from_config()
@@ -36,9 +49,18 @@ class ThiefRuntime:
             survival_threshold=config.get("rules.survival_threshold"),
         )
         self.brain = brain or ThiefBrain()
+        self.hint_writer = hint_writer or resolve_hint_writer(config)
+        self.listener = listener
+        self.controls = controls or GameControls()
         self.records: list[dict] = []
+        self.history: list[dict] = []
+        self.disputes: list[str] = []
         self.peer_identity: dict = {}
         self._incoming_step = 0
+        self._seen_turns: set[str] = set()
+        self._last_replayed = False
+        self._last_police_hint = ""
+        self.started_monotonic = time.monotonic()
         self._result: str | None = None
 
     def _transport_from_config(self) -> McpTransport:
@@ -56,29 +78,44 @@ class ThiefRuntime:
         )
 
     def run(self) -> dict:
+        self.started_monotonic = time.monotonic()
         self._negotiate()
+        self._notify({"type": "negotiated", "peer": self.peer_identity})
         self._take_turn()
         while self._result is None:
+            self.controls.wait_if_paused()
+            if self.controls.stopped:
+                self._result = "technical_loss"
+                break
             incoming = self.transport.poll_turn(self._turn_timeout())
             if incoming is None:
                 self._result = TIMEOUT
                 break
             response = self._receive_turn(incoming)
+            if self._last_replayed:
+                continue
             if self._result is not None:
                 if self._result == CAPTURE:
                     self._send_terminal(response)
                 break
             self._take_turn(response)
         audit = self._exchange_audit()
-        return {
+        summary = {
             "role": "thief",
             "result": self._result,
             "winner": "thief" if self._result == SURVIVAL else "police",
             "records": self.records,
+            "history": self.history,
+            "my_log": list(self.state.log),
+            "disputes": self.disputes,
             "audit": audit,
             "position": list(self.state.position),
             "steps": self.state.step_number,
+            "duration_seconds": round(time.monotonic() - self.started_monotonic, 3),
+            "group_id": self.config.get("game.group_id", "unknown-group"),
         }
+        self._notify({"type": "game_over", "summary": summary})
+        return summary
 
     def _negotiate(self) -> None:
         negotiation = Negotiation(terms_from_config(self.config), identity_from_config(self.config))
@@ -92,18 +129,20 @@ class ThiefRuntime:
         if not self.state.apply_move(action):
             action = hold()
             self.state.apply_move(action)
-        record = seal_step(self.state, action, decision)
+        hint = self.hint_writer(self.state, None, self._last_police_hint)
+        record = seal_step(self.state, action, decision, hint)
         self.records.append(record)
         win = self.rules.survival_result(self.state)
         self.transport.send_turn(
             turn_message(
                 record,
-                decision.hint,
+                hint,
                 claim_response,
                 bool(win),
                 smell_grid=self.scent.emit(self.state.position),
             )
         )
+        self._notify({"type": "moved", "decision": decision, "commit": record["commit"], "hint": hint})
         if win:
             self._result = SURVIVAL
 
@@ -113,10 +152,22 @@ class ThiefRuntime:
         except ProtocolError:
             self._result = "technical_loss"
             raise
+        self._last_replayed = False
+        fingerprint = message.commit or f"step-{message.step}"
+        if fingerprint in self._seen_turns:
+            self._last_replayed = True
+            dispute = f"ignored a repeat of an already-played turn (step {message.step})"
+            self.disputes.append(dispute)
+            self._notify({"type": "replay_ignored", "step": message.step})
+            return None
         if message.sender != "police" or message.step != self._incoming_step + 1:
             self._result = "technical_loss"
             raise ProtocolError("unexpected Police turn sender or step")
+        self._seen_turns.add(fingerprint)
         self._incoming_step = message.step
+        self.history.append(message.to_dict())
+        self._last_police_hint = message.hint
+        self._notify({"type": "incoming", "step": message.step, "hint": message.hint})
         # The Police has completed one turn. Predict its legal movement before
         # using the scent snapshot emitted with that turn as fresh evidence.
         self.belief.diffuse()
@@ -141,6 +192,10 @@ class ThiefRuntime:
                 self._result = CAPTURE
             return response
         return None
+
+    def _notify(self, event: dict) -> None:
+        if self.listener is not None:
+            self.listener({**event, "view": snapshot(self)})
 
     def _send_terminal(self, claim_response: dict | None) -> None:
         if not self.records:

@@ -20,8 +20,13 @@ smell_trust = 4.0
 # [strategy]  -- optional: point at YOUR thief brain subclass (else the shipped heuristic runs)
 # thief_class = "my_team.strategy:MyThiefBrain"
 
-# [trash_talk] -- optional: HOW the banter is produced. The MOVE is always pure Python.
-# provider = "template"   # template (0 tokens, default) | ollama | claude_api | claude_cli
+[trash_talk]
+# The MOVE is always pure Python; Ollama shapes only the verbal hint.
+provider = "ollama"              # template | ollama
+model = "qwen3:4b"
+ollama_url = "http://localhost:11434/api/generate"
+timeout_seconds = 5.0
+every_n_steps = 1
 
 [llm]
 model = "claude-opus-4-8[1m]"    # MY choice; the opponent may differ

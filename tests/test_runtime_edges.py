@@ -41,6 +41,23 @@ def test_invalid_police_turn_is_rejected(tmp_path):
         runtime._receive_turn({"step": 1})
 
 
+def test_replayed_police_turn_is_ignored_before_belief_fusion(tmp_path):
+    runtime = ThiefRuntime(config(tmp_path), QueueTransport(queue.Queue(), queue.Queue()))
+    runtime._take_turn()
+    message = TurnMessage(
+        1, "police", "Look north.", {"0,0": 0.9}, "ab" * 32, "2026-01-01T00:00:00Z"
+    ).to_dict()
+
+    runtime._receive_turn(message)
+    matrix = runtime.belief.as_matrix()
+    runtime._receive_turn(message)
+
+    assert runtime._last_replayed is True
+    assert runtime.belief.as_matrix() == matrix
+    assert len(runtime.history) == 1
+    assert "already-played" in runtime.disputes[-1]
+
+
 def test_illegal_brain_action_falls_back_to_hold(tmp_path):
     class InvalidBrain:
         def decide(self, state, belief):

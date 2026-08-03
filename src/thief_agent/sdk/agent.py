@@ -11,6 +11,7 @@ from pathlib import Path
 
 from thief_agent.infra.mcp_client import McpTransport
 from thief_agent.infra.mcp_server import start_peer_server
+from thief_agent.peer.controls import GameControls
 from thief_agent.peer.runtime import ThiefRuntime
 from thief_agent.sdk.options import MatchOptions
 from thief_agent.shared.config import ConfigManager
@@ -22,7 +23,16 @@ DEFAULT_REPLY_TIMEOUT = 30.0
 class ThiefAgentSDK:
     """Configure, connect, and play one Thief sub-game."""
 
-    def __init__(self, options=None, *, config=None, transport=None, brain=None) -> None:
+    def __init__(
+        self,
+        options=None,
+        *,
+        config=None,
+        transport=None,
+        brain=None,
+        listener=None,
+        controls=None,
+    ) -> None:
         self.options = options or MatchOptions()
         self.config = config if config is not None else ConfigManager(self.options.config_dir)
         if self.options.port is not None:
@@ -32,6 +42,8 @@ class ThiefAgentSDK:
         self._transport = transport
         self._runtime: ThiefRuntime | None = None
         self._brain = brain
+        self.listener = listener
+        self.controls = controls
 
     @property
     def host(self) -> str:
@@ -67,7 +79,13 @@ class ThiefAgentSDK:
     def runtime(self) -> ThiefRuntime:
         """Build the match runtime lazily and return the same instance thereafter."""
         if self._runtime is None:
-            self._runtime = ThiefRuntime(self.config, self.connect(), brain=self._brain)
+            self._runtime = ThiefRuntime(
+                self.config,
+                self.connect(),
+                brain=self._brain,
+                listener=self.listener,
+                controls=self.controls or GameControls(),
+            )
         return self._runtime
 
     def play(self) -> dict:
