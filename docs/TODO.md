@@ -53,8 +53,11 @@ with `https://github.com/Moaawiyah/police-agent.git`.
       using predict-then-update Bayesian ordering
 - [x] Add the lazy, injectable `ThiefAgentSDK` composition root with summary
       save/load support
+- [x] Add Ollama-backed coordinate-safe Thief dialogue with template fallback
+- [x] Ignore replayed Police commitments before belief fusion or answering
+- [x] Add live/replay Tk heatmap views and CLI commands
 
 ## Step 6 — Follow-up
 
 - [ ] Add multi-game series aggregation and role alternation
-- [ ] Add reporting artifacts, replay, and GUI integration
+- [ ] Add reporting artifacts and multi-game replay integration

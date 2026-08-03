@@ -15,7 +15,7 @@ def state_descriptor(state) -> str:
     )
 
 
-def seal_step(state, action: Action, decision) -> dict:
+def seal_step(state, action: Action, decision, hint: str | None = None) -> dict:
     """Seal the Thief's already-applied state and action."""
     payload = {
         "step": state.step_number,
@@ -24,7 +24,7 @@ def seal_step(state, action: Action, decision) -> dict:
         "move": str(action),
         "intent": decision.verdict,
         "verdict": decision.verdict,
-        "hint": decision.hint,
+        "hint": hint if hint is not None else decision.hint,
     }
     return {"payload": payload, **CommitReveal.seal(payload)}
 

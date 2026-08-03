@@ -47,6 +47,7 @@ src/thief_agent/
   infra/    Thief-side FastMCP server/client, email, and LLM provider
   peer/     Thief orchestration, handshake, and turn handling
   sdk/      lazy public composition root for callers and front ends
+  gui/      live/replay Tk heatmap and immutable view rendering
   shared/   shared config loading and rate limiting
 config/
   thief/    Thief's private config + its copy of the shared game.json
@@ -59,8 +60,14 @@ tests/      shared domain tests and Thief-specific tests
 uv sync
 cp config/thief/game.toml.example config/thief/game.toml
 uv run thief-agent play --config-dir config/thief
+uv run thief-agent gui --config-dir config/thief
+uv run thief-agent replay result.json --config-dir config/thief
 # mailbox-only mode (debugging/interop tools)
 uv run thief-agent server --port 8802
 uv run pytest
 uv run ruff check .
 ```
+
+The example private config selects local Ollama (`qwen3:4b`) for dialogue. If
+Ollama is unavailable, the Thief automatically sends a bounded template hint;
+movement and legality never depend on the model.
