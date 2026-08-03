@@ -18,11 +18,13 @@ class McpTransport:
         inboxes: PeerInboxes,
         connect_timeout: float = 30.0,
         retry_interval: float = 0.25,
+        reply_timeout: float | None = None,
     ) -> None:
         self.opponent_url = opponent_url
         self.inboxes = inboxes
         self.connect_timeout = connect_timeout
         self.retry_interval = retry_interval
+        self.reply_timeout = reply_timeout or connect_timeout
 
     def _call(self, tool: str, argument: dict) -> None:
         async def invoke() -> None:
@@ -51,7 +53,7 @@ class McpTransport:
     def exchange_agreement(self, message: dict) -> dict:
         """Send this peer's agreement and wait for the opponent's reply."""
         self.send_agreement(message)
-        reply = self.poll_agreement(self.connect_timeout)
+        reply = self.poll_agreement(self.reply_timeout)
         if reply is None:
             raise TimeoutError("Opponent did not send a game agreement")
         return reply
@@ -81,7 +83,7 @@ class McpTransport:
     def exchange_audit(self, payload: dict) -> dict | None:
         """Send an audit payload and wait briefly for the opponent's reveal."""
         self.send_audit(payload)
-        return self.poll_audit(self.connect_timeout)
+        return self.poll_audit(self.reply_timeout)
 
     def drain_inboxes(self) -> None:
         """Discard stale messages before starting a new handshake or game."""

@@ -5,6 +5,7 @@ from thief_agent.domain.crypto import audit_records
 from thief_agent.domain.own_state import OwnGameState
 from thief_agent.domain.protocol import AuditPayload, ProtocolError, TurnMessage
 from thief_agent.domain.rules import CAPTURE, SURVIVAL, TIMEOUT, GameRules
+from thief_agent.domain.scent import ScentField
 from thief_agent.infra.mcp_client import McpTransport
 from thief_agent.infra.mcp_server import start_peer_server
 from thief_agent.peer.handshake import (
@@ -24,10 +25,12 @@ class ThiefRuntime:
         validate_config(config)
         self.config = config
         self.transport = transport or self._transport_from_config()
+        self.terms = terms_from_config(config)
         size = config.get("board.size")
         start = tuple(config.get("positions.thief_start"))
         self.state = OwnGameState(start=start, board_size=size)
-        self.belief = BeliefGrid(size)
+        self.belief = BeliefGrid.from_config(self.terms, config)
+        self.scent = ScentField.from_terms(self.terms)
         self.rules = GameRules(
             max_steps=config.get("rules.max_steps"),
             survival_threshold=config.get("rules.survival_threshold"),
@@ -47,7 +50,8 @@ class ThiefRuntime:
         return McpTransport(
             self.config.get("network.opponent_url"),
             inboxes,
-            connect_timeout=self.config.get("network.connect_timeout_seconds", 30),
+            connect_timeout=self.config.get("network.watchdog_timeout_seconds", 60),
+            reply_timeout=self.config.get("network.response_timeout_seconds", 30),
             retry_interval=self.config.get("network.retry_interval_seconds", 0.25),
         )
 
@@ -67,6 +71,7 @@ class ThiefRuntime:
             self._take_turn(response)
         audit = self._exchange_audit()
         return {
+            "role": "thief",
             "result": self._result,
             "winner": "thief" if self._result == SURVIVAL else "police",
             "records": self.records,
@@ -90,7 +95,15 @@ class ThiefRuntime:
         record = seal_step(self.state, action, decision)
         self.records.append(record)
         win = self.rules.survival_result(self.state)
-        self.transport.send_turn(turn_message(record, decision.hint, claim_response, bool(win)))
+        self.transport.send_turn(
+            turn_message(
+                record,
+                decision.hint,
+                claim_response,
+                bool(win),
+                smell_grid=self.scent.emit(self.state.position),
+            )
+        )
         if win:
             self._result = SURVIVAL
 
@@ -104,11 +117,16 @@ class ThiefRuntime:
             self._result = "technical_loss"
             raise ProtocolError("unexpected Police turn sender or step")
         self._incoming_step = message.step
+        # The Police has completed one turn. Predict its legal movement before
+        # using the scent snapshot emitted with that turn as fresh evidence.
+        self.belief.diffuse()
+        self.belief.observe_smell(message.smell_grid)
         if message.barrier_placed:
             barrier = tuple(message.barrier_placed)
             if not self.state.board.in_bounds(barrier):
                 raise ProtocolError("Police barrier is off the board")
             self.state.note_barrier(barrier)
+            self.belief.exclude(barrier)
             if self.rules.barrier_captures(self.state, barrier) or self.rules.confinement_capture(self.state):
                 self._result = CAPTURE
                 return None

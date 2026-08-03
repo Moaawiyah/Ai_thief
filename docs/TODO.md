@@ -45,8 +45,16 @@ with `https://github.com/Moaawiyah/police-agent.git`.
 - [x] Add `thief-agent server` and `thief-agent play` subcommands
 - [x] Verify a complete one-game exchange over real FastMCP HTTP
 
-## Step 5 — Follow-up
+## Step 5 — Scent, belief fusion, and SDK (done)
 
-- [ ] Add full pheromone emission/decay and belief fusion
+- [x] Add reference-compatible 5x5 radial scent emission and multiplicative
+      decay with deterministic wire snapshots
+- [x] Merge incoming scent readings and fuse them into the Thief belief map
+      using predict-then-update Bayesian ordering
+- [x] Add the lazy, injectable `ThiefAgentSDK` composition root with summary
+      save/load support
+
+## Step 6 — Follow-up
+
 - [ ] Add multi-game series aggregation and role alternation
 - [ ] Add reporting artifacts, replay, and GUI integration

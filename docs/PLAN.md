@@ -17,7 +17,7 @@ tested, and verified against the specification before moving to the next.
 5. Commit-reveal/security — signed moves, SHA-256, nonce anti-replay (spec
    ch. 5).
 6. Scent and belief system — pheromone emission/decay, Bayesian belief map
-   (spec ch. 4, 6).
+   (spec ch. 4, 6). *(implemented)*
 7. Thief strategy — decoupled from the shared rules engine (spec ch. 6).
 8. GUI, replay, and reporting — live heatmap, replay viewer, mandatory
    Gmail report (spec ch. 7, 9).
