@@ -1,20 +1,18 @@
-"""The Thief peer's FastMCP server and thread-safe inbound mailboxes."""
+"""The Thief peer's own FastMCP server — there is no central server, ever.
+
+The server is this agent's public mailbox: the opponent pushes negotiation
+messages, two-phase commit/reveal turn messages, and audit payloads into
+thread-safe inboxes that the local runtime consumes.
+"""
 
 import queue
 import socket
 import threading
+import time
 
 from fastmcp import FastMCP
 
-
-class PeerInboxes:
-    """Queues filled by FastMCP tools and consumed by the local peer."""
-
-    def __init__(self) -> None:
-        self.agreements: queue.Queue[dict] = queue.Queue()
-        self.turns: queue.Queue[dict] = queue.Queue()
-        self.audits: queue.Queue[dict] = queue.Queue()
-        self.controls: queue.Queue[dict] = queue.Queue()
+from thief_agent.exceptions import SimulationError
 
 
 def _ensure_port_free(host: str, port: int) -> None:
@@ -23,14 +21,78 @@ def _ensure_port_free(host: str, port: int) -> None:
     try:
         probe.bind((host, port))
     except OSError as exc:
-        raise OSError(f"FastMCP port {port} on {host} is already in use") from exc
+        raise SimulationError(
+            f"FastMCP port {port} on {host} is already in use - a previous peer is "
+            f"probably still running, or another process owns the port. Stop it or "
+            f"change network.my_port in this peer's config/thief/game.toml."
+        ) from exc
     finally:
         probe.close()
+
+
+class PeerInboxes:
+    """Thread-safe mailboxes filled by MCP tools, drained by the runtime."""
+
+    def __init__(self) -> None:
+        self.agreements: queue.Queue[dict] = queue.Queue()
+        self.turns: queue.Queue[dict] = queue.Queue()
+        self.audits: queue.Queue[dict] = queue.Queue()
+        self.controls: queue.Queue[dict] = queue.Queue()  # bidirectional control channel
+        self.pending_commits: dict[str, dict] = {}
+        self.delivered_ids: set[str] = set()
+        self.commit_lock = threading.Lock()
+
+    def accept_commit(self, message: dict) -> dict:
+        """Store one idempotent commitment or reject a conflicting duplicate."""
+        message_id = str(message.get("message_id", ""))
+        if not message_id or not message.get("commit"):
+            raise SimulationError("commit requires message_id and commit")
+        with self.commit_lock:
+            existing = self.pending_commits.get(message_id)
+            if existing and existing.get("commit") != message.get("commit"):
+                raise SimulationError("conflicting duplicate commitment")
+            self.pending_commits[message_id] = dict(message)
+        return {"ok": True, "message_id": message_id, "acknowledged": True}
+
+    def accept_reveal(self, message: dict) -> dict:
+        """Queue a fresh reveal exactly once after validating its commitment.
+
+        Tolerant of peers that skip the commit phase entirely (message_id is
+        empty/absent): those turns are queued directly, same as before this
+        two-phase handshake existed, so older or simplified opponents still work.
+        """
+        message_id = str(message.get("message_id", ""))
+        if not message_id:
+            self.turns.put(message)
+            return {"ok": True, "message_id": "", "revealed": True}
+        with self.commit_lock:
+            if message_id in self.delivered_ids:
+                return {"ok": True, "message_id": message_id, "duplicate": True}
+            pending = self.pending_commits.get(message_id)
+            if pending is None:
+                raise SimulationError("reveal arrived without a prior commitment")
+            if pending.get("commit") != message.get("commit"):
+                raise SimulationError("reveal commitment does not match acknowledged hash")
+            envelope = ("schema_version", "game_id", "sub_game_number", "step", "sender")
+            if any(key in pending and pending[key] != message.get(key) for key in envelope):
+                raise SimulationError("reveal envelope does not match acknowledged commitment")
+            expiry = float(message.get("expires_at_epoch", 0.0) or 0.0)
+            if expiry and time.time() > expiry:
+                raise SimulationError("reveal expired before delivery")
+            self.pending_commits.pop(message_id, None)
+            self.delivered_ids.add(message_id)
+        self.turns.put(message)
+        return {"ok": True, "message_id": message_id, "revealed": True}
 
 
 def build_peer_server(role: str, inboxes: PeerInboxes) -> FastMCP:
     """Build this peer's public mailbox; no game state is exposed."""
     server = FastMCP(name=f"thief-agent-{role}")
+
+    @server.tool
+    def health() -> dict:
+        """Side-effect-free liveness and protocol-version probe."""
+        return {"ok": True, "role": role, "schema_version": "1.1"}
 
     @server.tool
     def negotiate(message: dict) -> dict:
@@ -39,10 +101,14 @@ def build_peer_server(role: str, inboxes: PeerInboxes) -> FastMCP:
         return {"ok": True}
 
     @server.tool
+    def commit_turn(message: dict) -> dict:
+        """Lock a turn hash and acknowledge it before any action is revealed."""
+        return inboxes.accept_commit(message)
+
+    @server.tool
     def receive_turn(message: dict) -> dict:
-        """Receive one opaque turn message from the opponent."""
-        inboxes.turns.put(message)
-        return {"ok": True}
+        """Accept a reveal, requiring a matching prior commitment when one was sent."""
+        return inboxes.accept_reveal(message)
 
     @server.tool
     def submit_audit(payload: dict) -> dict:

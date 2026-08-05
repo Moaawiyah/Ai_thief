@@ -14,7 +14,7 @@ def config(tmp_path, max_moves=3, survival_threshold=2):
     root.mkdir()
     (root / "game.toml").write_text(
         """
-version = "1.0"
+version = "1.10"
 [game]
 group_id = "thief-team"
 group_name = "Thief Team"
