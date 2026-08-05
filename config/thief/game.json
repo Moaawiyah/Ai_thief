@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.3",
+  "schema_version": "1.2",
   "_note": "Shared, agreed game terms. BOTH peers must hold a byte-identical copy; the pre-game signature exchange refuses to play on any mismatch. This overlays the private per-peer game.toml. Book: Appendix F.",
   "agreed_between": ["police01", "thief001"],
   "board_and_agents": {
@@ -34,13 +34,12 @@
   "pheromones": {
     "pheromone_center_intensity": 0.9,
     "pheromone_decay": 0.10,
-    "pheromone_grid_size": 5,
-    "pheromone_min_center_intensity": 0.5
+    "pheromone_grid_size": 5
   },
   "network_and_league": {
     "response_timeout_sec": 30,
     "watchdog_timeout_sec": 60,
-    "num_games": 6,
+    "num_games": 1,
     "diversity_reward": 10,
     "min_games_to_pass": 2,
     "max_games_per_team": 10,
