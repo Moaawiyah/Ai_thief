@@ -9,6 +9,7 @@ replay tooling without opening a socket.
 import json
 from pathlib import Path
 
+from thief_agent.exceptions import ConfigError
 from thief_agent.infra.mcp_client import McpTransport
 from thief_agent.infra.mcp_server import start_peer_server
 from thief_agent.peer.controls import GameControls
@@ -18,6 +19,37 @@ from thief_agent.shared.config import ConfigManager
 
 DEFAULT_CONNECT_TIMEOUT = 60.0
 DEFAULT_REPLY_TIMEOUT = 30.0
+
+
+class StubLlm:
+    """Unparseable on purpose: forces the deterministic fallback policy."""
+
+    last_usage = {"model": "stub", "in": 0, "out": 0, "total": 0}
+    tokens_consumed = 0
+
+    def send(self, prompt: str, timeout=None, schema=None) -> str:
+        return "stub reply - no structured move here"
+
+
+class GatedLlm:
+    """A structured LLM provider routed through the API gatekeeper."""
+
+    def __init__(self, provider, gatekeeper):
+        self._provider = provider
+        self._gatekeeper = gatekeeper
+
+    @property
+    def last_usage(self) -> dict:
+        return self._provider.last_usage
+
+    @property
+    def tokens_consumed(self) -> int:
+        return self._provider.tokens_consumed
+
+    def send(self, prompt: str, timeout=None, schema=None) -> str:
+        return self._gatekeeper.execute(
+            self._provider.send, prompt, timeout=timeout, schema=schema
+        )
 
 
 class ThiefAgentSDK:
@@ -92,6 +124,37 @@ class ThiefAgentSDK:
         """Play one configured sub-game and return the complete summary."""
         return self.runtime.run()
 
+    def _build_llm(self, stub: bool = False):
+        """Resolve the movement-tactics LLM (independent of the hint-writer's own
+        provider): template/stub by default, or a gatekeeper-wrapped provider."""
+        provider_name = str(self.config.get("llm.provider", "template")).lower()
+        if stub or provider_name == "template":
+            return StubLlm()
+        from thief_agent.shared.gatekeeper import ApiGatekeeper
+
+        if provider_name == "ollama":
+            from thief_agent.infra.ollama_provider import OllamaLlmProvider
+
+            return GatedLlm(OllamaLlmProvider(self.config), ApiGatekeeper(self.config, "ollama"))
+        if provider_name not in {"claude", "claude_cli"}:
+            raise ConfigError("llm.provider must be template, ollama, or claude_cli")
+        from thief_agent.infra.llm_provider import ClaudeCliProvider
+
+        return GatedLlm(ClaudeCliProvider(self.config), ApiGatekeeper(self.config, "claude"))
+
+    def play_series(self, stub_llm: bool = False):
+        """Play the whole configured series (game.num_games sub-games), sharing
+        this SDK's transport/controls across them. Returns a `SeriesResult`."""
+        from thief_agent.peer.sealing import validate_agreement
+        from thief_agent.sdk.series import run_series
+
+        validate_agreement(self.config)
+        self._llm = self._build_llm(stub_llm)
+        return run_series(
+            self.config, self.connect(), brain=self._brain,
+            listener=self.listener, controls=self.controls or GameControls(),
+        )
+
     def save_summary(self, summary: dict, path: str | Path) -> Path:
         """Persist the complete match record for reporting or replay."""
         destination = Path(path)
@@ -103,12 +166,8 @@ class ThiefAgentSDK:
         try:
             return json.loads(Path(path).read_text(encoding="utf-8"))
         except FileNotFoundError as exc:
-            from thief_agent.shared.config import ConfigError
-
             raise ConfigError(f"Match log not found: {path}") from exc
         except json.JSONDecodeError as exc:
-            from thief_agent.shared.config import ConfigError
-
             raise ConfigError(f"Match log is not valid JSON: {path}: {exc}") from exc
 
 

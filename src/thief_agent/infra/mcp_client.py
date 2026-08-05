@@ -106,8 +106,12 @@ class McpTransport:
         with contextlib.suppress(ConnectionError, SimulationError):
             self._send("receive_control", message, timeout=self.control_send_timeout)
 
-    def poll_control(self, timeout: float | None = None) -> dict | None:
-        return self._poll(self.inboxes.controls, timeout)
+    def poll_control(self) -> dict | None:
+        """Non-blocking drain of one pending control message (None if empty)."""
+        try:
+            return self.inboxes.controls.get_nowait()
+        except queue.Empty:
+            return None
 
     def exchange_audit(self, payload: dict) -> dict | None:
         """Send an audit payload and wait briefly for the opponent's reveal."""

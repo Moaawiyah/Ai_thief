@@ -65,6 +65,13 @@ class BeliefGrid:
         self._probabilities = fresh
         self._normalize()
 
+    def observe_likelihoods(self, evidence: dict[Cell, float]) -> None:
+        """Apply soft evidence from a parsed verbal hint and renormalize."""
+        for (row, column), likelihood in evidence.items():
+            if self._in_bounds((row, column)):
+                self._probabilities[row][column] *= max(_EPSILON, float(likelihood))
+        self._normalize()
+
     def scale(self, cells, factor: float) -> None:
         """Reweight selected cells for evidence that is not scent."""
         for cell in cells:
