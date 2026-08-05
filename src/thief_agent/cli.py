@@ -19,6 +19,16 @@ def main(argv: list[str] | None = None) -> None:
     play.add_argument("--host")
     play.add_argument("--port", type=int)
     play.add_argument("--opponent-url")
+    series = commands.add_parser(
+        "series", help="run the whole agreed series, write artifacts, and email the result"
+    )
+    series.add_argument("--config-dir", default="config/thief")
+    series.add_argument("--host")
+    series.add_argument("--port", type=int)
+    series.add_argument("--opponent-url")
+    series.add_argument(
+        "--stub-llm", action="store_true", help="deterministic policy, no LLM calls"
+    )
     gui = commands.add_parser("gui", help="run a live game with a heatmap window")
     gui.add_argument("--config-dir", default="config/thief")
     gui.add_argument("--host")
@@ -58,6 +68,29 @@ def main(argv: list[str] | None = None) -> None:
         from thief_agent.peer.runtime import ThiefRuntime
 
         print(json.dumps(ThiefRuntime(config).run(), indent=2))
+        return
+    if args.command == "series":
+        from thief_agent.exceptions import SimulationError
+        from thief_agent.sdk.agent import ThiefAgentSDK
+
+        try:
+            outcome = ThiefAgentSDK(config=config).play_series(stub_llm=args.stub_llm)
+        except SimulationError as exc:
+            parser.error(str(exc))
+        summary = outcome["summary"]
+        print(
+            json.dumps(
+                {
+                    "result": summary["result"],
+                    "winner": summary["winner"],
+                    "steps": summary["steps"],
+                    "log": outcome["log_path"],
+                    "email": outcome["email"],
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         return
     if args.command == "gui":
         from thief_agent.gui.player import LivePeerApp
