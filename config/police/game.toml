@@ -1,0 +1,63 @@
+version = "1.10"
+
+[game]
+group_name = "Police-Agent-Demo"
+group_id = "police01"
+sub_game_number = 1
+members = ["REPLACE_STUDENT_1", "REPLACE_STUDENT_2"]
+repos = { cop = "https://github.com/MohammdS/police-agent", thief = "https://github.com/MohammdS/thief-agent" }
+mcp_servers = { cop = "http://127.0.0.1:8802/mcp", thief = "http://127.0.0.1:8801/mcp" }
+
+[strategy]
+police_class = "police_thief.strategy.team_strategy:TrapPoliceBrain"
+thief_class = "police_thief.strategy.team_strategy:MobilityThiefBrain"
+mode = "llm"
+llm_shortlist_size = 3
+llm_min_confidence = 0.55
+
+[trash_talk]
+provider = "ollama"
+model = "qwen3:8b"
+every_n_steps = 1
+min_confidence = 0.55
+
+[belief]
+smell_trust_weight = 4.0
+
+[gui]
+cell_px = 52
+
+[paths]
+logs_dir = "logs"
+log_filename = "{role}_match.json"
+
+[play]
+step_speed_seconds = 0.0
+seed = 211506787
+
+[network]
+host = "127.0.0.1"
+my_port = 8802
+opponent_url = "http://127.0.0.1:8801/mcp"
+turn_timeout_seconds = 180
+response_timeout_seconds = 30
+poll_interval_seconds = 0.25
+connect_timeout_seconds = 60
+retry_interval_seconds = 1.0
+audit_send_timeout_seconds = 10
+
+[llm]
+provider = "ollama"
+model = "qwen3:8b"
+ollama_url = "http://127.0.0.1:11434/api/generate"
+timeout_seconds = 30
+step_deadline_seconds = 30
+short_prompt_threshold_seconds = 10
+
+[email]
+recipient = "rmisegal+uoh26finalgame@gmail.com"
+mode = "draft"
+enabled = false
+outbox_dir = "artifacts/reports"
+credentials_file = "credentials.json"
+token_file = "token.json"

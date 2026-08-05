@@ -4,10 +4,9 @@ import re
 from dataclasses import MISSING, asdict, dataclass, fields
 from typing import Any
 
+from thief_agent.exceptions import ProtocolError
 
-class ProtocolError(ValueError):
-    """Raised when an inbound peer message is not protocol-compatible."""
-
+__all__ = ["ProtocolError", "TurnMessage", "AuditPayload", "ControlMessage"]
 
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _ROLES = {"police", "thief"}
@@ -16,8 +15,10 @@ _ROLES = {"police", "thief"}
 def _cell(value: Any, field: str) -> list[int] | None:
     if value is None:
         return None
-    if not isinstance(value, list) or len(value) != 2 or any(
-        isinstance(item, bool) or not isinstance(item, int) for item in value
+    if (
+        not isinstance(value, list)
+        or len(value) != 2
+        or any(isinstance(item, bool) or not isinstance(item, int) for item in value)
     ):
         raise ProtocolError(f"{field} must be a two-integer list")
     return value
@@ -37,6 +38,13 @@ class TurnMessage:
     capture_claim: list | None = None
     claim_response: dict | None = None
     win_claim: dict | None = None
+    message_id: str = ""  # idempotency key for commit/reveal
+    expires_at_epoch: float = 0.0  # stale reveals are rejected
+    move_reveal: str = ""  # action revealed after commit acknowledgement
+    prior_commit: str = ""  # binds this turn to the previous local commitment
+    schema_version: str = "1.1"  # explicit wire-contract version
+    game_id: str = ""  # negotiated series identity
+    sub_game_number: int = 1  # current role-alternating subgame
 
     def __post_init__(self) -> None:
         if isinstance(self.step, bool) or not isinstance(self.step, int) or self.step < 1:
@@ -57,6 +65,22 @@ class TurnMessage:
             not isinstance(self.win_claim, dict) or self.win_claim.get("type") != "survival"
         ):
             raise ProtocolError("win_claim must be {'type': 'survival'}")
+        if not isinstance(self.message_id, str):
+            raise ProtocolError("message_id must be text")
+        if isinstance(self.expires_at_epoch, bool) or not isinstance(
+            self.expires_at_epoch, (int, float)
+        ):
+            raise ProtocolError("expires_at_epoch must be a number")
+        if not isinstance(self.move_reveal, str) or not isinstance(self.prior_commit, str):
+            raise ProtocolError("move_reveal and prior_commit must be text")
+        if not isinstance(self.schema_version, str) or not isinstance(self.game_id, str):
+            raise ProtocolError("schema_version and game_id must be text")
+        if (
+            isinstance(self.sub_game_number, bool)
+            or not isinstance(self.sub_game_number, int)
+            or self.sub_game_number < 1
+        ):
+            raise ProtocolError("sub_game_number must be a positive integer")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -1,63 +1,31 @@
-"""Private TOML plus shared JSON configuration loading."""
+"""ConfigManager: loads game.toml + rate_limits.json, validates versions,
+serves values via dotted keys with defaults, and overlays the shared
+(signed) game.json terms when present.
+"""
 
+import hashlib
 import json
 import tomllib
 from pathlib import Path
 from typing import Any
 
+from thief_agent.exceptions import ConfigError, ConfigVersionError
+from thief_agent.shared.config_translate import deep_merge, translate_shared
+from thief_agent.shared.version import SUPPORTED_CONFIG_VERSIONS
 
-class ConfigError(ValueError):
-    """Raised when the local or shared configuration is missing or invalid."""
+__all__ = ["ConfigError", "ConfigVersionError", "ConfigManager"]
 
-
-def _deep_merge(base: dict, overlay: dict) -> None:
-    for key, value in overlay.items():
-        if isinstance(value, dict) and isinstance(base.get(key), dict):
-            _deep_merge(base[key], value)
-        else:
-            base[key] = value
+GAME_FILE = "game.toml"
+RATE_FILE = "rate_limits.json"
+SHARED_GAME_FILE = "game.json"
 
 
-def _shared_overlay(shared: dict) -> dict:
-    board = shared.get("board_and_agents", {})
-    movement = shared.get("movement_and_barriers", {})
-    pheromones = shared.get("pheromones", {})
-    network = shared.get("network_and_league", {})
-    world = shared.get("world", {})
-    return {
-        "board": {
-            "size": board.get("grid_size"),
-            "axis_origin_corner": board.get("axis_origin_corner", "top-left"),
-            "axis_start_index": board.get("axis_start_index", 0),
-        },
-        "positions": {
-            "thief_start": board.get("thief_start"),
-            "cop_start": board.get("cop_start"),
-        },
-        "play": {
-            "setting": world.get("map_area", ""),
-            "hint_max_words": world.get("hint_max_words", 15),
-        },
-        "rules": {
-            "move_set": movement.get("move_set", ["N", "S", "E", "W", "STAY"]),
-            "barriers_max": movement.get("max_barriers", 0),
-            "max_steps": movement.get("max_moves"),
-            "survival_threshold": movement.get("survival_threshold"),
-        },
-        "smell": {
-            "grid_size": pheromones.get("pheromone_grid_size", 5),
-            "decay_per_step": pheromones.get("pheromone_decay", 0.1),
-            "emit_intensity": pheromones.get("pheromone_center_intensity", 0.9),
-            "min_center_intensity": pheromones.get("pheromone_min_center_intensity", 0.5),
-        },
-        "network": {
-            "turn_timeout_seconds": network.get("response_timeout_sec", 30),
-            "response_timeout_seconds": network.get("response_timeout_sec", 30),
-            "watchdog_timeout_seconds": network.get("watchdog_timeout_sec", 60),
-        },
-        "game": {"num_games": network.get("num_games", 1)},
-        "scoring": shared.get("scoring", {}),
-    }
+def _check_version(data: dict, source: str) -> None:
+    version = data.get("version", "unknown")
+    if version not in SUPPORTED_CONFIG_VERSIONS:
+        raise ConfigVersionError(
+            f"{source} version {version!r} not supported; supported: {SUPPORTED_CONFIG_VERSIONS}"
+        )
 
 
 class ConfigManager:
@@ -67,13 +35,23 @@ class ConfigManager:
         self.directory = Path(config_dir)
         if not self.directory.is_dir():
             raise ConfigError(f"Config directory not found: {self.directory}")
-        self._data = self._read_toml(self.directory / "game.toml")
-        shared_path = self.directory / "game.json"
-        if not shared_path.is_file():
-            raise ConfigError(f"Missing shared game configuration: {shared_path}")
-        shared = self._read_json(shared_path)
-        _deep_merge(self._data, _shared_overlay(shared))
-        self.shared = shared
+        self._data = self._read_toml(self.directory / GAME_FILE)
+        self._rates = self._read_json(self.directory / RATE_FILE, required=False)
+        _check_version(self._data, GAME_FILE)
+        if self._rates:
+            _check_version(self._rates, RATE_FILE)
+        # Optional shared, agreed game terms (JSON). When present it overlays the
+        # local TOML game-terms, so both peers play byte-identical agreed rules.
+        shared_path = self.directory / SHARED_GAME_FILE
+        if shared_path.is_file():
+            raw = shared_path.read_bytes()
+            shared = self._read_json(shared_path, required=True)
+            deep_merge(self._data, translate_shared(shared))
+            self.shared = shared
+            self._shared_sha256 = hashlib.sha256(raw).hexdigest()
+        else:
+            self.shared = {}
+            self._shared_sha256 = ""
 
     @staticmethod
     def _read_toml(path: Path) -> dict:
@@ -86,16 +64,21 @@ class ConfigManager:
             raise ConfigError(f"Invalid TOML in {path}: {exc}") from exc
 
     @staticmethod
-    def _read_json(path: Path) -> dict:
+    def _read_json(path: Path, *, required: bool) -> dict:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except (FileNotFoundError, json.JSONDecodeError) as exc:
-            raise ConfigError(f"Invalid or missing shared JSON: {path}") from exc
+        except FileNotFoundError:
+            if required:
+                raise ConfigError(f"Missing config file: {path}") from None
+            return {}
+        except json.JSONDecodeError as exc:
+            raise ConfigError(f"Invalid JSON in {path}: {exc}") from exc
         if not isinstance(data, dict):
-            raise ConfigError(f"Shared configuration must be an object: {path}")
+            raise ConfigError(f"Configuration must be an object: {path}")
         return data
 
     def get(self, dotted_key: str, default: Any = None) -> Any:
+        """Fetch a game.toml value by dotted key, e.g. 'board.size'."""
         node: Any = self._data
         for part in dotted_key.split("."):
             if not isinstance(node, dict) or part not in node:
@@ -111,8 +94,23 @@ class ConfigManager:
         return value
 
     def override(self, dotted_key: str, value: Any) -> None:
+        """Set a value by dotted key (e.g. live GUI sub-game overrides)."""
         parts = dotted_key.split(".")
         node = self._data
         for part in parts[:-1]:
             node = node.setdefault(part, {})
         node[parts[-1]] = value
+
+    @property
+    def rate_limits(self) -> dict:
+        """The full rate_limits.json contents (empty dict if none present)."""
+        return self._rates
+
+    @property
+    def shared_sha256(self) -> str:
+        """SHA-256 of the exact shared game.json bytes used by this peer."""
+        return self._shared_sha256
+
+    def service_limits(self, service: str) -> dict:
+        """Rate limits for a service, falling back to the default block."""
+        return self._rates.get("services", {}).get(service) or self._rates.get("default", {})

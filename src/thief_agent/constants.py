@@ -35,3 +35,14 @@ DELTAS: dict[Direction, tuple[int, int]] = {
     Direction.E: (0, 1),
     Direction.W: (0, -1),
 }
+
+VERDICT_TRUTH = "truth"
+VERDICT_LIE = "lie"
+
+# Crypto: nonce length (bytes) for commit-reveal sealing.
+NONCE_BYTES = 16
+
+# Fixed game texts (protocol messages, not tunables).
+FALLBACK_HINT = "I keep moving through the streets."  # generic but contains a location cue
+FINAL_CAUGHT_HINT = "You got me."
+NO_HINT_PLACEHOLDER = "(silence)"
