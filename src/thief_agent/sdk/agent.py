@@ -47,9 +47,7 @@ class GatedLlm:
         return self._provider.tokens_consumed
 
     def send(self, prompt: str, timeout=None, schema=None) -> str:
-        return self._gatekeeper.execute(
-            self._provider.send, prompt, timeout=timeout, schema=schema
-        )
+        return self._gatekeeper.execute(self._provider.send, prompt, timeout=timeout, schema=schema)
 
 
 class ThiefAgentSDK:
@@ -64,6 +62,7 @@ class ThiefAgentSDK:
         brain=None,
         listener=None,
         controls=None,
+        workdir: str | Path = ".",
     ) -> None:
         self.options = options or MatchOptions()
         self.config = config if config is not None else ConfigManager(self.options.config_dir)
@@ -76,6 +75,7 @@ class ThiefAgentSDK:
         self._brain = brain
         self.listener = listener
         self.controls = controls
+        self._workdir = Path(workdir)
 
     @property
     def host(self) -> str:
@@ -142,18 +142,60 @@ class ThiefAgentSDK:
 
         return GatedLlm(ClaudeCliProvider(self.config), ApiGatekeeper(self.config, "claude"))
 
-    def play_series(self, stub_llm: bool = False):
-        """Play the whole configured series (game.num_games sub-games), sharing
-        this SDK's transport/controls across them. Returns a `SeriesResult`."""
-        from thief_agent.peer.sealing import validate_agreement
+    def play_series(self, stub_llm: bool = False) -> dict:
+        """Play the whole configured series (game.num_games sub-games), write the
+        four standardized JSON artifacts, keep the legacy Hebrew log, and (if
+        enabled) email the result JSON. Sharing this SDK's transport/controls
+        across every sub-game."""
+        from thief_agent.infra.email_sender import EmailSender
+        from thief_agent.peer.sealing import terms_from_config, validate_agreement
+        from thief_agent.report.emit import emit_series
+        from thief_agent.report.report_writer import build_report
         from thief_agent.sdk.series import run_series
+        from thief_agent.strategy import resolve_brain
 
         validate_agreement(self.config)
         self._llm = self._build_llm(stub_llm)
-        return run_series(
-            self.config, self.connect(), brain=self._brain,
-            listener=self.listener, controls=self.controls or GameControls(),
+        brain = self._brain or resolve_brain(self.config, self._llm)
+        series = run_series(
+            self.config,
+            self.connect(),
+            brain=brain,
+            listener=self.listener,
+            controls=self.controls or GameControls(),
         )
+
+        logs_dir = self._workdir / self.config.get("paths.logs_dir", "logs")
+        result_json = emit_series(self.config, logs_dir, series)
+
+        last = series.summaries[-1]
+        report = build_report(last, self.config, terms=terms_from_config(self.config))
+        self._save_log(last, report)  # legacy Hebrew log (back-compat)
+
+        winner = result_json["final_result"].get("winner_group") or last["winner"]
+        subject = f"Police-Thief series result: winner {winner} (reported by thief)"
+        email = EmailSender(self.config).send_report(result_json, subject)
+        group_id = series.own_identity.get("group_id", "unknown-group")
+        result_path = logs_dir / group_id / f"result_{series.game_id}.json"
+        return {
+            "summary": last,
+            "report": report,
+            "email": email,
+            "summaries": series.summaries,
+            "result": result_json,
+            "log_path": str(result_path),
+        }
+
+    def _save_log(self, summary: dict, report: dict) -> Path:
+        logs_dir = self._workdir / self.config.get("paths.logs_dir", "logs")
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        pattern = self.config.get("paths.log_filename", "{role}_match.json")
+        path = logs_dir / pattern.format(role="thief")
+        path.write_text(
+            json.dumps({"summary": summary, "report": report}, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return path
 
     def save_summary(self, summary: dict, path: str | Path) -> Path:
         """Persist the complete match record for reporting or replay."""

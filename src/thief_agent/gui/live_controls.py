@@ -1,4 +1,4 @@
-"""Start/pause/play/stop/quit controls for a live Thief match."""
+"""Start/pause/play/stop/quit/restart controls for a live Thief match."""
 
 import tkinter as tk
 
@@ -17,6 +17,13 @@ class LiveControls:
         self.stop.pack(side="left")
         self.quit = tk.Button(bar, text="Quit", command=app.quit)
         self.quit.pack(side="left", padx=(8, 0))
+        self.restart = tk.Button(bar, text="Restart", command=app.restart)
+        self.restart.pack(side="left", padx=(8, 0))
+        self._bidi = tk.BooleanVar(value=False)
+        self.bidi_check = tk.Checkbutton(
+            bar, text="Bidirectional control", variable=self._bidi, command=app.toggle_bidirectional
+        )
+        self.bidi_check.pack(side="left", padx=(8, 0))
 
     def mark_started(self) -> None:
         self.start.config(state="disabled")

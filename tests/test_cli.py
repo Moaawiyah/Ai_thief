@@ -46,10 +46,15 @@ def test_server_dispatches_to_fastmcp(monkeypatch):
     )
     monkeypatch.setattr("thief_agent.infra.mcp_server.PeerInboxes", FakeInboxes)
     thief_agent.main(["server", "--host", "0.0.0.0", "--port", "9901"])
-    assert calls == [{
-        "transport": "http", "host": "0.0.0.0", "port": 9901,
-        "show_banner": False, "log_level": "warning",
-    }]
+    assert calls == [
+        {
+            "transport": "http",
+            "host": "0.0.0.0",
+            "port": 9901,
+            "show_banner": False,
+            "log_level": "warning",
+        }
+    ]
 
 
 def test_main_requires_a_subcommand():

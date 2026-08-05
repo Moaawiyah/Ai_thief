@@ -16,7 +16,9 @@ MIN_TICK_MS = 50
 
 
 class ReplayApp:
-    def __init__(self, config, log_data: dict, opponent_log: dict | None = None, window=None) -> None:
+    def __init__(
+        self, config, log_data: dict, opponent_log: dict | None = None, window=None
+    ) -> None:
         self._size = int(config.require("board.size"))
         self._trust = float(config.get("belief.smell_trust", DEFAULT_SMELL_TRUST))
         view = normalize_log(log_data)
@@ -50,7 +52,9 @@ class ReplayApp:
         total = self._total_steps()
         if self._index >= total:
             self._playing = False
-            self._window.set_turn(False, f"REPLAY DONE: {self._result} - winner {str(self._winner).upper()}")
+            self._window.set_turn(
+                False, f"REPLAY DONE: {self._result} - winner {str(self._winner).upper()}"
+            )
             return
         index = self._index
         self._apply_my_step(index)
@@ -87,17 +91,31 @@ class ReplayApp:
                 "visited": self._visited,
                 "barriers": self._barriers,
                 "belief": self._belief.as_matrix(),
-                "opponent_position": tuple(self._opponent[min(index, theirs - 1)]) if theirs else None,
+                "opponent_position": tuple(self._opponent[min(index, theirs - 1)])
+                if theirs
+                else None,
                 "opponent_role": "police",
                 "message": frozen_message(index, mine, theirs),
             }
         )
-        self._window.set_label("status", f"step {index + 1}/{total} | audit {'PASSED' if self._audit.get('passed') else 'FAILED'}")
+        self._window.set_label(
+            "status",
+            f"step {index + 1}/{total} | audit {'PASSED' if self._audit.get('passed') else 'FAILED'}",
+        )
 
     def restart(self) -> None:
         self._reset_state()
         self._playing = False
-        self._window.render({"role": self._role, "step": 0, "position": None, "visited": set(), "barriers": set(), "belief": self._belief.as_matrix()})
+        self._window.render(
+            {
+                "role": self._role,
+                "step": 0,
+                "position": None,
+                "visited": set(),
+                "barriers": set(),
+                "belief": self._belief.as_matrix(),
+            }
+        )
         self._window.set_turn(False, "RESTARTED - press Play")
 
     def goto(self, step: int) -> None:

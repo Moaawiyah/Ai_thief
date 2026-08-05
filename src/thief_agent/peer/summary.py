@@ -56,6 +56,9 @@ def finish(rt) -> dict:
         "group_id": rt.config.get("game.group_id", "unknown-group"),
         "group_name": rt.config.get("game.group_name", "unnamed"),
         "sub_game_number": rt.sub_game_number,
+        "started_at": rt.started_at,
+        "tokens_total": rt.tokens_total,
+        "state_transitions": [],
     }
     rt._notify({"type": "game_over", "summary": summary})
     return summary

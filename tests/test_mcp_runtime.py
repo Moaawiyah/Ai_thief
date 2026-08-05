@@ -12,9 +12,7 @@ from thief_agent.peer.runtime import ThiefRuntime
 def test_one_game_completes_over_real_fastmcp(tmp_path):
     thief_inboxes = start_peer_server("thief", "127.0.0.1", 18981)
     police_inboxes = start_peer_server("police", "127.0.0.1", 18982)
-    thief_transport = McpTransport(
-        "http://127.0.0.1:18982/mcp", thief_inboxes, connect_timeout=10
-    )
+    thief_transport = McpTransport("http://127.0.0.1:18982/mcp", thief_inboxes, connect_timeout=10)
     police_transport = McpTransport(
         "http://127.0.0.1:18981/mcp", police_inboxes, connect_timeout=10
     )

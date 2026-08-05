@@ -12,6 +12,7 @@ from thief_agent.domain.game_ids import derive_game_ids
 from thief_agent.domain.negotiation import Negotiation
 from thief_agent.peer.sealing import (
     identity_from_config,
+    now_iso,
     terms_from_config,
     validate_agreement,
     validate_config,
@@ -43,3 +44,4 @@ def negotiate(rt) -> None:
         rt.peer_identity.get("group_id", "unknown-group"),
     )
     rt.started_monotonic = time.monotonic()  # game clock starts at agreement
+    rt.started_at = now_iso()

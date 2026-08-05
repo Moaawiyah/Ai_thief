@@ -15,9 +15,7 @@ def emission_kernel(grid_size: int, intensity: float) -> dict[tuple[int, int], f
     half = grid_size // 2
     spread = 2.0 * _FALLOFF_SIGMA**2
     return {
-        (row, column): round(
-            intensity * math.exp(-(row**2 + column**2) / spread), 3
-        )
+        (row, column): round(intensity * math.exp(-(row**2 + column**2) / spread), 3)
         for row in range(-half, half + 1)
         for column in range(-half, half + 1)
     }

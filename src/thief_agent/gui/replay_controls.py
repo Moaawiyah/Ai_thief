@@ -14,7 +14,9 @@ def build_controls(app, root) -> None:
     tk.Label(bar, text="  Go to step:").pack(side="left")
     step = tk.StringVar(value="1")
     tk.Spinbox(bar, from_=1, to=MAX_STEP, width=5, textvariable=step).pack(side="left")
-    tk.Button(bar, text="Go", command=lambda: app.goto(as_step(step.get()))).pack(side="left", padx=6)
+    tk.Button(bar, text="Go", command=lambda: app.goto(as_step(step.get()))).pack(
+        side="left", padx=6
+    )
 
 
 def as_step(text: str, default: int = 1) -> int:

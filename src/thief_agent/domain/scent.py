@@ -84,9 +84,7 @@ class ScentField:
     def snapshot(self) -> dict[str, float]:
         """Return ``{"row,column": intensity}`` for all live traces."""
         return {
-            f"{row},{column}": value
-            for (row, column), value in self._values.items()
-            if value > 0.0
+            f"{row},{column}": value for (row, column), value in self._values.items() if value > 0.0
         }
 
     def _radial(self, center: Cell, intensity: float) -> dict[Cell, float]:

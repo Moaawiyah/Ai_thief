@@ -17,7 +17,12 @@ def test_false_capture_claim_returns_honest_response(tmp_path):
     runtime = ThiefRuntime(config(tmp_path), QueueTransport(queue.Queue(), queue.Queue()))
     runtime._take_turn()
     message = TurnMessage(
-        1, "police", "Where are you?", {}, "ab" * 32, "2026-01-01T00:00:00Z",
+        1,
+        "police",
+        "Where are you?",
+        {},
+        "ab" * 32,
+        "2026-01-01T00:00:00Z",
         capture_claim=[3, 3],
     )
     assert runtime._receive_turn(message.to_dict()) == {"claim": [3, 3], "caught": False}
@@ -28,7 +33,12 @@ def test_barrier_on_current_cell_captures(tmp_path):
     runtime = ThiefRuntime(config(tmp_path), QueueTransport(queue.Queue(), queue.Queue()))
     runtime._take_turn()
     message = TurnMessage(
-        1, "police", "Wall.", {}, "ab" * 32, "2026-01-01T00:00:00Z",
+        1,
+        "police",
+        "Wall.",
+        {},
+        "ab" * 32,
+        "2026-01-01T00:00:00Z",
         barrier_placed=[4, 3],
     )
     assert runtime._receive_turn(message.to_dict()) is None
