@@ -66,7 +66,9 @@ class HintWriter:
 
     def _user(self, opponent_hint: str) -> str:
         said = opponent_hint.strip()
-        heard = f'The police just said: "{said}". Answer them.' if said else "The police said nothing."
+        heard = (
+            f'The police just said: "{said}". Answer them.' if said else "The police said nothing."
+        )
         return f"You are escaping. {heard}"
 
 
@@ -101,7 +103,7 @@ def _clean(reply: str, max_words: int) -> str:
     if _COORDINATES.search(text):
         return ""
     line = next((part.strip() for part in text.splitlines() if part.strip()), "")
-    return _cap(line.strip('"\'` ').replace("*", ""), max_words)
+    return _cap(line.strip("\"'` ").replace("*", ""), max_words)
 
 
 def _cap(hint: str, max_words: int) -> str:

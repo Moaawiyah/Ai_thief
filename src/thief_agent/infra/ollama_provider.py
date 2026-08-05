@@ -64,8 +64,6 @@ class OllamaLlmProvider:
         tokens_in = int(wrapper.get("prompt_eval_count", 0) or 0)
         tokens_out = int(wrapper.get("eval_count", 0) or 0)
         total = tokens_in + tokens_out
-        self.last_usage = {
-            "model": self._model, "in": tokens_in, "out": tokens_out, "total": total
-        }
+        self.last_usage = {"model": self._model, "in": tokens_in, "out": tokens_out, "total": total}
         self.tokens_consumed += total
         return text

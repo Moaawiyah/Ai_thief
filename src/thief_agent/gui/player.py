@@ -9,6 +9,8 @@ from thief_agent.gui.live_apply import apply_event
 from thief_agent.gui.live_controls import LiveControls
 from thief_agent.gui.window import PeerWindow
 from thief_agent.peer.controls import GameControls
+from thief_agent.shared.git_info import code_revision
+from thief_agent.shared.version import CODE_VERSION
 
 DRAIN_INTERVAL_MS = 100
 CLOCK_INTERVAL_MS = 1000
@@ -33,7 +35,15 @@ class LivePeerApp:
         mode, model = mode_and_model(agent.config)
         self._window.set_label("mode", mode)
         self._window.set_label("model", model)
-        self._window.add_menu({"role": "thief", "verbal_mode": mode, "model": model})
+        self._window.add_menu(
+            {
+                "role": "thief",
+                "verbal_mode": mode,
+                "model": model,
+                "code_version": CODE_VERSION,
+                "commit": code_revision().get("commit", "unknown"),
+            }
+        )
         self._bar = LiveControls(self._window.root, self)
 
     def start(self) -> None:
@@ -59,6 +69,15 @@ class LivePeerApp:
         self._controls.stop()
         self._window.set_turn(False, "QUITTING...")
         self._window.root.after(QUIT_GRACE_MS, self._window.root.destroy)
+
+    def restart(self) -> None:
+        """Request a whole-series restart over the bidirectional control channel."""
+        self._controls.request_restart()
+        self._window.set_label("status", "restart requested...")
+
+    def toggle_bidirectional(self) -> None:
+        """Opt in to the bidirectional control channel (status/restart/quit)."""
+        self._controls.request_enable()
 
     def _worker(self) -> None:
         try:

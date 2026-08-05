@@ -62,13 +62,15 @@ class BrainBase:
         deadline_seconds: float | None = None,
         **_: object,
     ) -> Decision:
-        del opponent_hint, setting, barriers_max
+        del setting, barriers_max
         started = time.perf_counter()
         move_type, direction = self._decide_move(state, belief)
         source, action_id, prompt, reasoning, fallback_reason = "heuristic", "", "", "", ""
         used_fallback = False
         if self._tactics is not None:
-            choice = self._tactics.choose(state, belief, move_type, direction, deadline_seconds)
+            choice = self._tactics.choose(
+                state, belief, move_type, direction, opponent_hint, deadline_seconds
+            )
             move_type, direction = choice.move_type, choice.direction
             source, action_id = choice.source, choice.action_id
             prompt, reasoning = choice.prompt, choice.reasoning

@@ -40,8 +40,13 @@ def _play_all(config, brain, hint_writer, transport, listener, controls, link) -
     game_id = game_uid = None
     for sub_game_number in range(1, num_games + 1):
         runtime = ThiefRuntime(
-            config, transport, brain=brain, hint_writer=hint_writer,
-            listener=listener, controls=controls, sub_game_number=sub_game_number,
+            config,
+            transport,
+            brain=brain,
+            hint_writer=hint_writer,
+            listener=listener,
+            controls=controls,
+            sub_game_number=sub_game_number,
             link=link,
         )
         summaries.append(runtime.run())
@@ -50,8 +55,9 @@ def _play_all(config, brain, hint_writer, transport, listener, controls, link) -
     return SeriesResult(summaries, own_identity, peer_identity, game_id, game_uid)
 
 
-def run_series(config, transport, brain=None, hint_writer=None,
-               listener=None, controls=None) -> SeriesResult:
+def run_series(
+    config, transport, brain=None, hint_writer=None, listener=None, controls=None
+) -> SeriesResult:
     """Play the whole series; a control-channel RestartSeries restarts it from
     sub-game 1 (the ControlLink is shared so the enable state survives a restart)."""
     controls = controls or GameControls()

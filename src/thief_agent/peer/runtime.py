@@ -50,7 +50,9 @@ class ThiefRuntime:
         self.listener = listener
         self.controls = controls or GameControls()
         self.handler = TurnHandler(self.state, self.belief, self.rules)
-        self.link = link or ControlLink("thief", self.transport, self.controls, listener=self._notify)
+        self.link = link or ControlLink(
+            "thief", self.transport, self.controls, listener=self._notify
+        )
         self.sub_game_number = sub_game_number
         self.records: list[dict] = []
         self.peer_identity: dict = {}
@@ -59,6 +61,8 @@ class ThiefRuntime:
         self._last_replayed = False
         self._last_police_hint = ""
         self.started_monotonic = time.monotonic()
+        self.started_at = ""
+        self.tokens_total = 0
         self._result: str | None = None
 
     @property

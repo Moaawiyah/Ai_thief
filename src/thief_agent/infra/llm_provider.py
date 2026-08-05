@@ -50,8 +50,13 @@ class ClaudeCliProvider:
     def _verify_cli(self) -> str:
         try:
             result = subprocess.run(
-                f"{self._executable} --version", capture_output=True, text=True,
-                timeout=10, shell=True, encoding="utf-8", errors="replace",
+                f"{self._executable} --version",
+                capture_output=True,
+                text=True,
+                timeout=10,
+                shell=True,
+                encoding="utf-8",
+                errors="replace",
             )
             if result.returncode == 0:
                 return result.stdout.strip()
@@ -86,13 +91,17 @@ class ClaudeCliProvider:
         effective_timeout = timeout or self._timeout
         try:
             result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=effective_timeout,
-                shell=True, encoding="utf-8", errors="replace", env=env,
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=effective_timeout,
+                shell=True,
+                encoding="utf-8",
+                errors="replace",
+                env=env,
             )
         except subprocess.TimeoutExpired as exc:
-            raise ProviderTimeoutError(
-                f"claude CLI timed out after {effective_timeout}s"
-            ) from exc
+            raise ProviderTimeoutError(f"claude CLI timed out after {effective_timeout}s") from exc
         if result.returncode != 0:
             error = result.stderr.strip() or result.stdout.strip() or "Unknown CLI error"
             if "auth" in error.lower() or "login" in error.lower():
@@ -112,11 +121,17 @@ class ClaudeCliProvider:
     def _record_usage(self, wrapper: dict) -> None:
         """Capture token usage from the CLI's JSON wrapper for the sealed log."""
         usage = wrapper.get("usage") or {}
-        tokens_in = sum(usage.get(key, 0) or 0 for key in (
-            "input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"))
+        tokens_in = sum(
+            usage.get(key, 0) or 0
+            for key in ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")
+        )
         tokens_out = usage.get("output_tokens", 0) or 0
-        self.last_usage = {"model": self._model, "in": tokens_in,
-                           "out": tokens_out, "total": tokens_in + tokens_out}
+        self.last_usage = {
+            "model": self._model,
+            "in": tokens_in,
+            "out": tokens_out,
+            "total": tokens_in + tokens_out,
+        }
         self.tokens_consumed += tokens_in + tokens_out
 
     @staticmethod
