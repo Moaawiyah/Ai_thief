@@ -82,7 +82,14 @@ def identity_from_config(config) -> dict:
 
 
 def terms_from_config(config) -> dict:
-    """The signed game agreement: everything both peers MUST match on."""
+    """The signed game agreement: everything both peers MUST match on.
+
+    `llm_tactics_allowed`, `llm_contract_version` and `config_sha256` are
+    deliberately NOT here: they are this peer's own local settings/derived
+    values, not something the Police peer's terms dict is built to match, and
+    the handshake fails on any key present on one side and absent on the
+    other even when every shared value agrees (`domain/negotiation.py`).
+    """
     return {
         "board_size": config.get("board.size"),
         "smell_grid_size": config.get("smell.grid_size", 5),
@@ -98,16 +105,13 @@ def terms_from_config(config) -> dict:
         "thief_start": config.get("positions.thief_start"),
         "cop_start": config.get("positions.cop_start"),
         "num_games": config.get("game.num_games", 1),
-        "llm_tactics_allowed": config.get("strategy.llm_tactics_allowed", False),
-        "llm_contract_version": config.get("strategy.llm_contract_version", ""),
-        "config_sha256": getattr(config, "shared_sha256", ""),
     }
 
 
 def validate_agreement(config) -> None:
     """Fail fast (before any server/port is opened) if a required agreed term is
-    missing, and — when LLM tactics are turned on locally — that both peers signed
-    the same contract version."""
+    missing, and — when LLM tactics are turned on locally — that this peer's own
+    config carries the signed contract version. Not agreed terms: local-only."""
     terms = terms_from_config(config)
     missing = [name for name in REQUIRED_TERMS if terms.get(name) is None]
     if missing:
@@ -117,9 +121,9 @@ def validate_agreement(config) -> None:
             "Make sure config/thief/game.json exists and is complete."
         )
     if str(config.get("strategy.mode", "heuristic")).lower() == "llm":
-        if not terms["llm_tactics_allowed"]:
+        if not config.get("strategy.llm_tactics_allowed", False):
             raise ConfigError("LLM tactics require mutual signed consent in game.json")
-        if terms["llm_contract_version"] != "1.0":
+        if config.get("strategy.llm_contract_version", "") != "1.0":
             raise ConfigError("LLM tactics require signed contract_version '1.0'")
     shared = getattr(config, "shared", None)
     if shared:

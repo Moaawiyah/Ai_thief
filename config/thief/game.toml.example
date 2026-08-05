@@ -10,7 +10,6 @@ repos = { cop = "https://github.com/Moaawiyah/police-agent.git", thief = "https:
 [network]
 my_port         = 8802                             # MY MCP server port
 opponent_url    = "http://127.0.0.1:8801/mcp"       # the only thing I know about the opponent
-turn_timeout_seconds = 180
 
 [belief]
 # Private confidence in scent evidence. Physical scent constants remain signed
@@ -28,10 +27,22 @@ ollama_url = "http://localhost:11434/api/generate"
 timeout_seconds = 5.0
 every_n_steps = 1
 
+# [gui] -- how the window paces itself. Purely local presentation: it slows the
+# board down so a human can follow it, and slows nothing the opponent can see.
+# Leave it at 0 for a league match -- the Police watchdog is still running.
+[gui]
+step_seconds = 0.0             # pause after each of my moves; replay defaults to 0.5
+
 [llm]
 model = "claude-opus-4-8[1m]"    # MY choice; the opponent may differ
 step_deadline_seconds = 30       # hard cap on LLM thinking per step
 
+# The mandatory end-of-game report. Private per-peer settings: the recipient
+# and the credential paths are mine alone and never belong in the signed
+# game.json.
 [email]
+enabled = false                        # a real API call is opt-in, always
 recipient = "rmisegal+uoh26finalgame@gmail.com"
 mode = "draft"
+credentials_file = "credentials.json"  # downloaded per Appendix Alef; gitignored
+token_file = "token.json"              # written by the one-time consent flow; gitignored
