@@ -9,7 +9,12 @@ from thief_agent.gui.replay_data import (
     verify_record,
 )
 from thief_agent.gui.window import PeerWindow
-from thief_agent.strategy.belief import DEFAULT_SMELL_TRUST, BeliefGrid
+from thief_agent.strategy.belief import (
+    DEFAULT_LEAK,
+    DEFAULT_SMELL_POWER,
+    DEFAULT_SMELL_TRUST,
+    BeliefGrid,
+)
 
 DEFAULT_STEP_SECONDS = 0.5
 MIN_TICK_MS = 50
@@ -21,6 +26,8 @@ class ReplayApp:
     ) -> None:
         self._size = int(config.require("board.size"))
         self._trust = float(config.get("belief.smell_trust", DEFAULT_SMELL_TRUST))
+        self._power = float(config.get("belief.smell_power", DEFAULT_SMELL_POWER))
+        self._leak = float(config.get("belief.leak", DEFAULT_LEAK))
         view = normalize_log(log_data)
         self._records = view["records"]
         self._history = view["history"]
@@ -40,7 +47,7 @@ class ReplayApp:
         self._window.set_label("mode", "Replay")
 
     def _reset_state(self) -> None:
-        self._belief = BeliefGrid(self._size, self._trust)
+        self._belief = BeliefGrid(self._size, self._trust, self._power, self._leak)
         self._barriers: set = set()
         self._visited: set = set()
         self._index = 0

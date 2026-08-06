@@ -1,20 +1,19 @@
 """Bayesian belief fusion for the unseen Police position.
 
-The Thief never receives the Police's true position during play.  It instead
-runs the same predict/update filter as the reference peer:
-
-1. ``diffuse`` spreads belief over legal Police moves;
-2. ``scale`` can fold non-scent evidence into the prior;
-3. ``observe_smell`` applies the received pheromone field as a likelihood.
-
-The order is important.  Scent is evidence about the Police's new position,
-so it must sharpen the prediction after movement rather than being blurred by
-the next prediction step.
+The Thief never receives the Police's true position: ``diffuse`` predicts
+(spreads belief over legal Police moves), ``observe_smell`` updates (the
+pheromone field sharpens it as a likelihood), and ``scale`` folds in non-scent
+evidence. Order matters -- scent must sharpen the prediction after movement,
+not be blurred away by the next predict step.
 """
 
 from thief_agent.constants import Cell
 
 DEFAULT_SMELL_TRUST = 4.0
+# Convexity of intensity->likelihood -- starves a stale trail cell harder than a fresh one.
+DEFAULT_SMELL_POWER = 2.0
+# Sliver of the posterior re-mixed to uniform each turn -- readings are a trail, not independent.
+DEFAULT_LEAK = 0.03
 _EPSILON = 1e-9
 
 
@@ -23,28 +22,40 @@ class BeliefGrid:
 
     _OFFSETS = ((0, 0), (-1, 0), (1, 0), (0, -1), (0, 1))
 
-    def __init__(self, board_size: int, smell_trust: float = DEFAULT_SMELL_TRUST) -> None:
+    def __init__(
+        self,
+        board_size: int,
+        smell_trust: float = DEFAULT_SMELL_TRUST,
+        smell_power: float = DEFAULT_SMELL_POWER,
+        leak: float = DEFAULT_LEAK,
+    ) -> None:
         if board_size < 1:
             raise ValueError("Belief grid size must be positive")
         self.size = board_size
         self._smell_trust = smell_trust
+        self._smell_power = smell_power
+        self._leak = leak
         probability = 1.0 / (board_size * board_size)
         self._probabilities = [[probability for _ in range(board_size)] for _ in range(board_size)]
 
     @classmethod
     def from_config(cls, terms: dict, config) -> "BeliefGrid":
-        """Use signed board terms and this peer's private trust tuning."""
+        """Signed board terms and this peer's private trust/power/leak tuning."""
         trust = config.get("belief.smell_trust", DEFAULT_SMELL_TRUST)
-        return cls(terms["board_size"], trust)
+        power = config.get("belief.smell_power", DEFAULT_SMELL_POWER)
+        leak = config.get("belief.leak", DEFAULT_LEAK)
+        return cls(terms["board_size"], trust, power, leak)
 
     def observe_smell(self, cells: dict | None) -> None:
-        """Multiply scented cells by ``1 + trust * intensity`` and normalize."""
+        """``1 + trust * intensity**power`` per scented cell, normalize, then leak."""
         for key, value in (cells or {}).items():
             cell = self._parse(key)
             if cell is not None and isinstance(value, int | float):
                 row, column = cell
-                self._probabilities[row][column] *= 1.0 + self._smell_trust * float(value)
+                boost = 1.0 + self._smell_trust * float(value) ** self._smell_power
+                self._probabilities[row][column] *= boost
         self._normalize()
+        self._leak_toward_uniform()
 
     def diffuse(self) -> None:
         """Predict one Police turn using stay-put and orthogonal movement."""
@@ -115,6 +126,16 @@ class BeliefGrid:
             ]
             return
         self._probabilities = [[value / total for value in row] for row in self._probabilities]
+
+    def _leak_toward_uniform(self) -> None:
+        """Only ``observe_smell`` calls this -- others already normalize once a turn."""
+        if self._leak <= 0.0:
+            return
+        probability = 1.0 / (self.size * self.size)
+        self._probabilities = [
+            [(1.0 - self._leak) * value + self._leak * probability for value in row]
+            for row in self._probabilities
+        ]
 
     def _in_bounds(self, cell: Cell) -> bool:
         return 0 <= cell[0] < self.size and 0 <= cell[1] < self.size
