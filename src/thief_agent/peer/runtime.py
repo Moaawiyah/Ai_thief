@@ -8,13 +8,13 @@ from thief_agent.domain.rules import CAPTURE, TIMEOUT, GameRules
 from thief_agent.domain.scent import ScentField
 from thief_agent.infra.mcp_client import McpTransport
 from thief_agent.infra.mcp_server import start_peer_server
-from thief_agent.peer import handshake, summary, turn_sender
+from thief_agent.peer import belief_log, handshake, summary, turn_sender
 from thief_agent.peer.control_link import ControlLink
 from thief_agent.peer.controls import GameControls
 from thief_agent.peer.handshake import terms_from_config, validate_config
 from thief_agent.peer.sealing import build_terminal_message
 from thief_agent.peer.turn_handler import TurnHandler
-from thief_agent.strategy import BeliefGrid, ThiefBrain
+from thief_agent.strategy import BeliefGrid, resolve_brain
 from thief_agent.strategy.talk import resolve_hint_writer
 
 
@@ -46,11 +46,14 @@ class ThiefRuntime:
             max_steps=config.get("rules.max_steps"),
             survival_threshold=config.get("rules.survival_threshold"),
         )
-        self.brain = brain or ThiefBrain()
         self.llm = llm
+        self.brain = brain or resolve_brain(config, llm=llm)
         gatekeeper = getattr(self.transport, "gatekeeper", None)
         hint_gatekeeper = gatekeeper
-        if hint_writer is None and str(config.get("trash_talk.provider", "template")).lower() == "ollama":
+        if (
+            hint_writer is None
+            and str(config.get("trash_talk.provider", "template")).lower() == "ollama"
+        ):
             from thief_agent.shared.gatekeeper import ApiGatekeeper
 
             hint_gatekeeper = ApiGatekeeper(config, "ollama")
@@ -63,6 +66,7 @@ class ThiefRuntime:
         )
         self.sub_game_number = sub_game_number
         self.records: list[dict] = []
+        self.belief_log: list[dict] = []  # one entry per Bayes-filter update
         self.peer_identity: dict = {}
         self.game_id: str | None = None
         self.game_uid: str | None = None
@@ -137,6 +141,7 @@ class ThiefRuntime:
         self._last_replayed = outcome.replayed
         if outcome.result is not None:
             self._result = outcome.result
+        belief_log.record(self, outcome)
         self._last_police_hint = self.handler.history[-1]["hint"] if self.handler.history else ""
         return outcome.claim_response
 

@@ -68,8 +68,15 @@ class BeliefGrid:
         self._normalize()
         self._leak_toward_uniform()
 
-    def diffuse(self) -> None:
-        """Predict one Police turn using stay-put and orthogonal movement."""
+    def diffuse(self, barriers: set[Cell] | None = None) -> None:
+        """Predict one Police turn using stay-put and orthogonal movement.
+
+        A declared barrier is impassable, so a target cell in `barriers` is
+        never a legal Police step and must not receive spread mass -- left
+        unfiltered, probability keeps leaking onto cells Police can never
+        reach, and the posterior never concentrates the way it should.
+        """
+        blocked = barriers or set()
         fresh = [[0.0] * self.size for _ in range(self.size)]
         for row in range(self.size):
             for column in range(self.size):
@@ -80,7 +87,10 @@ class BeliefGrid:
                     (row + d_row, column + d_column)
                     for d_row, d_column in self._OFFSETS
                     if in_bounds((row + d_row, column + d_column), self.size)
+                    and (row + d_row, column + d_column) not in blocked
                 ]
+                if not targets:
+                    targets = [(row, column)]  # walled in on every side: mass stays put
                 share = mass / len(targets)
                 for target_row, target_column in targets:
                     fresh[target_row][target_column] += share

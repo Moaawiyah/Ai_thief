@@ -59,7 +59,9 @@ class TurnHandler:
 
         # The Police has completed one turn: predict its legal movement, then
         # sharpen the prediction with the fresh scent and any verbal location cue.
-        self.belief.diffuse()
+        # Known barriers are impassable, so the prediction must not spread mass
+        # onto them (they were leaking probability the filter never got back).
+        self.belief.diffuse(self.state.barriers)
         self.belief.observe_smell(message.smell_grid)
         self.belief.observe_likelihoods(infer_likelihoods(message.hint, self.state.board.size))
 

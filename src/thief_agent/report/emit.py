@@ -20,6 +20,7 @@ from thief_agent.report.artifacts import (
     config_filename,
     declaration_filename,
     log_filename,
+    record_filename,
     result_filename,
 )
 from thief_agent.report.report_writer import consensus_signature
@@ -99,6 +100,10 @@ def emit_series(config, logs_dir, series) -> dict:
             log_filename(game_id, n),
             build_log(summary, game_id, game_uid, own_gid, opp_gid),
         )
+        # The raw runtime summary, belief_log included -- not one of the four
+        # schema-fixed artifacts, but the only place the Bayes-filter trail
+        # actually lands on disk.
+        _write(own_dir, record_filename(game_id, n), summary)
         sub_games.append(subgame_entry(summary, game_id, own, opp, scoring_cfg))
 
     agg = scoring.aggregate([sg["score"] for sg in sub_games], scoring_cfg.get("tie_score", 2))

@@ -73,3 +73,21 @@ def test_capture_claim_completes_and_audit_passes(tmp_path):
     assert results["thief"]["result"] == "capture"
     assert results["police"]["result"] == "capture"
     assert results["thief"]["audit"]["passed"] is True
+
+
+def test_the_summary_carries_one_belief_snapshot_per_accepted_turn(tmp_path):
+    """The trail a replay -- or a diagnosis of the filter itself -- needs:
+    the smell grid that arrived each turn and the posterior it produced.
+
+    Thief opens (spec: it moves before hearing from Police), so its own
+    `my_log` always runs one move ahead of `belief_log`, which only grows on
+    a turn actually *received* from Police."""
+    results = run_pair(tmp_path)
+
+    log = results["thief"]["belief_log"]
+    assert len(log) == len(results["thief"]["my_log"]) - 1
+    assert [entry["step"] for entry in log] == list(range(1, len(log) + 1))
+    assert "smell_grid" in log[0] and "belief" in log[0]
+    size = len(log[0]["belief"])
+    assert size == len(log[0]["belief"][0]) == 7
+    assert abs(sum(sum(row) for row in log[0]["belief"]) - 1.0) < 1e-9

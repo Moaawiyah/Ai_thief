@@ -1,9 +1,12 @@
 """Standardized artifacts, Hebrew report output, and safe email delivery."""
 
+import json
+
 from thief_agent.infra.email_sender import EmailSender
 from thief_agent.report.artifact_helpers import (
     canonical_sha256,
     ended_at,
+    group_block,
     hardware_spec,
     links,
     tokens_series,
@@ -49,6 +52,7 @@ def summary():
         "tokens_total": 7, "records": [], "history": [message],
         "audit": {"passed": True, "own": {"verified_steps": 1, "failed_steps": []}},
         "state_transitions": [],
+        "belief_log": [{"step": 1, "smell_grid": {}, "belief": [[1.0]]}],
     }
 
 
@@ -70,6 +74,31 @@ def test_artifact_helpers_and_builders_are_canonical():
     assert result["num_sub_games"] == 0
 
 
+def test_group_block_reads_our_own_spec_key():
+    own = identity("thief-team", "thief")
+
+    assert group_block(own)["hardware_spec"]["gpu_model"] == "gpu"
+
+
+def test_group_block_also_accepts_the_police_peers_differently_named_key():
+    """A real series crashed here: the Police repo's own identity payload
+    names this field `hardware_spec`, not `spec` -- nothing in the (unsigned)
+    identity block ever pinned the two repos to agree on that name."""
+    opponent = identity("police-team", "police")
+    opponent["hardware_spec"] = opponent.pop("spec")
+
+    assert group_block(opponent)["hardware_spec"]["gpu_model"] == "gpu"
+
+
+def test_group_block_degrades_to_empty_fields_rather_than_crash():
+    """Neither key present at all -- some future, differently-shaped
+    opponent -- must still produce a report instead of failing the series."""
+    opponent = identity("mystery-team", "police")
+    del opponent["spec"]
+
+    assert group_block(opponent)["hardware_spec"]["gpu_model"] is None
+
+
 def test_emit_series_writes_named_files_and_report(tmp_path):
     config = ConfigManager("config/thief")
     own, opp = identity("thief-team", "thief"), identity("police-team", "police")
@@ -79,6 +108,8 @@ def test_emit_series_writes_named_files_and_report(tmp_path):
     assert (folder / "declaration_g1.json").exists()
     assert (folder / "config_g1_g01.json").exists()
     assert (folder / "log_g1_g01.json").exists()
+    record = json.loads((folder / "record_g1_g01.json").read_text(encoding="utf-8"))
+    assert record["belief_log"] == summary()["belief_log"]
     assert result["final_result"]["tokens_total_series"]["thief-team"] == 7
     report = build_report(summary(), config, {"board_size": 7})
     assert report["סך_טוקנים_שנצרכו"] == 7

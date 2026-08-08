@@ -26,6 +26,31 @@ def test_prediction_spreads_only_to_stay_or_orthogonal_cells():
     assert matrix[3][2] > matrix[2][2]
 
 
+def test_a_declared_barrier_gets_no_spread_mass():
+    """Police cannot legally step onto a cell it has walled off, so a target
+    in `barriers` must be skipped -- left unfiltered, probability keeps
+    leaking onto cells Police can never reach and never gets reclaimed."""
+    belief = BeliefGrid(7)
+    belief.observe_smell({"3,3": 0.9})
+
+    belief.diffuse(barriers={(2, 3)})
+
+    assert belief.as_matrix()[2][3] == 0.0
+
+
+def test_mass_is_conserved_even_when_every_target_is_blocked():
+    """Walled in on every side, including staying put: mass has nowhere to
+    go but stay -- it must not just vanish."""
+    belief = BeliefGrid(7)
+    belief.observe_smell({"3,3": 0.9})
+    barriers = {(3, 3), (2, 3), (4, 3), (3, 2), (3, 4)}
+
+    belief.diffuse(barriers=barriers)
+
+    assert total(belief) == 1.0
+    assert belief.as_matrix()[3][3] > 0.0
+
+
 def test_empty_scent_does_not_reset_a_previous_belief():
     belief = BeliefGrid(7)
     belief.observe_smell({"6,6": 0.9})

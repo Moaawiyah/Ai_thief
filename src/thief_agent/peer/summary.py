@@ -59,6 +59,10 @@ def finish(rt) -> dict:
         "started_at": rt.started_at,
         "tokens_total": rt.tokens_total,
         "state_transitions": [],
+        # Per-step Bayes-filter trail: the smell grid that arrived and the
+        # posterior it produced, for a faithful replay and for diagnosing the
+        # filter itself -- not just its eventual effect on where Thief walked.
+        "belief_log": rt.belief_log,
     }
     rt._notify({"type": "game_over", "summary": summary})
     return summary

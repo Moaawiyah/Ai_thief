@@ -14,6 +14,7 @@ from thief_agent.report.artifact_helpers import (
     group_block,
     links,
     log_filename,
+    record_filename,
     result_filename,
     tokens_series,
 )
@@ -35,6 +36,7 @@ __all__ = [
     "config_filename",
     "declaration_filename",
     "log_filename",
+    "record_filename",
     "result_filename",
 ]
 
