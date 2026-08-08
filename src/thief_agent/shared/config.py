@@ -11,7 +11,10 @@ from typing import Any
 
 from thief_agent.exceptions import ConfigError, ConfigVersionError
 from thief_agent.shared.config_translate import deep_merge, translate_shared
-from thief_agent.shared.version import SUPPORTED_CONFIG_VERSIONS
+from thief_agent.shared.version import (
+    SUPPORTED_CONFIG_VERSIONS,
+    SUPPORTED_SHARED_SCHEMA_VERSIONS,
+)
 
 __all__ = ["ConfigError", "ConfigVersionError", "ConfigManager"]
 
@@ -25,6 +28,15 @@ def _check_version(data: dict, source: str) -> None:
     if version not in SUPPORTED_CONFIG_VERSIONS:
         raise ConfigVersionError(
             f"{source} version {version!r} not supported; supported: {SUPPORTED_CONFIG_VERSIONS}"
+        )
+
+
+def _check_shared_schema(data: dict) -> None:
+    version = data.get("schema_version", "unknown")
+    if version not in SUPPORTED_SHARED_SCHEMA_VERSIONS:
+        raise ConfigVersionError(
+            "game.json schema version "
+            f"{version!r} not supported; supported: {SUPPORTED_SHARED_SCHEMA_VERSIONS}"
         )
 
 
@@ -46,6 +58,7 @@ class ConfigManager:
         if shared_path.is_file():
             raw = shared_path.read_bytes()
             shared = self._read_json(shared_path, required=True)
+            _check_shared_schema(shared)
             deep_merge(self._data, translate_shared(shared))
             self.shared = shared
             self._shared_sha256 = hashlib.sha256(raw).hexdigest()

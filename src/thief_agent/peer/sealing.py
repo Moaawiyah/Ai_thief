@@ -3,6 +3,7 @@ the per-step state payloads and the one-time host-spec declaration.
 """
 
 from datetime import UTC, datetime
+from urllib.parse import urlparse
 
 from thief_agent.domain.crypto import CommitReveal
 from thief_agent.exceptions import ConfigError
@@ -112,6 +113,7 @@ def validate_agreement(config) -> None:
     """Fail fast (before any server/port is opened) if a required agreed term is
     missing, and — when LLM tactics are turned on locally — that this peer's own
     config carries the signed contract version. Not agreed terms: local-only."""
+    validate_config(config)
     terms = terms_from_config(config)
     missing = [name for name in REQUIRED_TERMS if terms.get(name) is None]
     if missing:
@@ -146,3 +148,6 @@ def validate_config(config) -> None:
     missing = [name for name, value in required.items() if value is None]
     if missing:
         raise ConfigError("Missing required configuration: " + ", ".join(missing))
+    opponent_url = str(required["network.opponent_url"])
+    if urlparse(opponent_url).scheme not in {"http", "https"}:
+        raise ConfigError("network.opponent_url must include an http:// or https:// scheme")

@@ -7,6 +7,7 @@ from thief_agent.gui.board_view import BoardView
 MY_TURN_COLOR = "#2ecc71"
 WAITING_COLOR = "#95a5a6"
 PANEL_ROWS = (
+    ("game", "Sub-game"),
     ("step", "Step"),
     ("mode", "Verbal mode"),
     ("model", "Model"),

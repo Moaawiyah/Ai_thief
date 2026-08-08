@@ -2,11 +2,14 @@
 push the wire message. Split from runtime.py to keep it small.
 """
 
+from dataclasses import replace
+
 from thief_agent.domain.actions import hold
 from thief_agent.domain.rules import SURVIVAL
 from thief_agent.peer import runtime_control
 from thief_agent.peer.sealing import build_turn_message
 from thief_agent.peer.step_records import sealed_step_record
+from thief_agent.peer.token_meter import step_usage, total
 
 __all__ = ["take_turn"]
 
@@ -24,20 +27,23 @@ def take_turn(rt, claim_response: dict | None = None) -> None:
     if rt._result is not None:
         return
 
+    token_count_before = total(rt)
     decision = rt.brain.decide(rt.state, rt.belief)
     action = decision.action()
     if not rt.state.apply_move(action):
         action = hold()
         rt.state.apply_move(action)
-    hint = rt.hint_writer(rt.state, None, rt._last_police_hint)
+    hint, decision = _write_hint(rt, decision)
 
     prior_commit = rt.records[-1]["commit"] if rt.records else ""
+    usage, tokens_step = step_usage(rt, token_count_before)
+    rt.tokens_total += tokens_step
     record = sealed_step_record(
         rt.state,
         decision,
         hint,
-        {"model": "heuristic", "total": 0},
-        0,
+        usage,
+        rt.tokens_total,
         game_id=rt.game_id or "",
         sub_game_number=rt.sub_game_number,
         prior_commit=prior_commit,
@@ -58,3 +64,25 @@ def take_turn(rt, claim_response: dict | None = None) -> None:
     rt._notify({"type": "moved", "decision": decision, "commit": record["commit"], "hint": hint})
     if win:
         rt._result = SURVIVAL
+
+
+def _write_hint(rt, decision):
+    """Use grounded LLM hints when configured, retaining legacy writers."""
+    writer = rt.hint_writer
+    if not hasattr(writer, "say"):
+        return writer(rt.state, None, rt._last_police_hint), decision
+    deadline = rt.config.get("trash_talk.timeout_seconds") or rt.config.get(
+        "llm.step_deadline_seconds"
+    )
+    hint, _, _, _ = writer.say(
+        rt.state,
+        rt.belief,
+        rt.config.get("play.setting", ""),
+        rt._last_police_hint,
+        deadline,
+    )
+    return hint, replace(
+        decision,
+        hint_source=getattr(writer, "last_source", "template"),
+        hint_fallback_reason=getattr(writer, "last_fallback_reason", ""),
+    )

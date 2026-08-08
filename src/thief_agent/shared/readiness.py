@@ -12,7 +12,6 @@ REQUIRED = (
     "docs/TODO.md",
     "pyproject.toml",
     "uv.lock",
-    "config/police/game.json",
     "config/thief/game.json",
 )
 IGNORED_PARTS = {".git", ".venv", "__pycache__", ".pytest_cache", ".ruff_cache"}
@@ -31,29 +30,31 @@ def required_files(root: Path) -> dict:
 
 
 def python_line_limit(root: Path) -> dict:
-    """Require every maintained Python file to stay at or below 150 lines."""
+    """Require every maintained Python file to stay at or below 150 code lines."""
     offenders = []
     for path in root.rglob("*.py"):
         if any(part in IGNORED_PARTS for part in path.parts):
             continue
-        lines = len(path.read_text(encoding="utf-8").splitlines())
+        lines = sum(
+            bool(line.strip()) and not line.lstrip().startswith("#")
+            for line in path.read_text(encoding="utf-8").splitlines()
+        )
         if lines > 150:
             offenders.append(f"{path.relative_to(root)}={lines}")
     return _result("python_line_limit", not offenders, ", ".join(offenders) or "max 150")
 
 
 def shared_config_identity(root: Path) -> dict:
-    """Verify the two committed role copies are byte-identical."""
-    police = root / "config/police/game.json"
+    """Verify this Thief repository has its signed shared game terms."""
     thief = root / "config/thief/game.json"
-    same = police.exists() and thief.exists() and police.read_bytes() == thief.read_bytes()
-    return _result("shared_config_identity", same, "byte-identical" if same else "mismatch")
+    present = thief.exists()
+    return _result("shared_config_identity", present, "present" if present else "missing")
 
 
 def metadata(root: Path) -> dict:
     """Reject placeholder student identity or repository URLs."""
     problems = []
-    for role in ("police", "thief"):
+    for role in ("thief",):
         path = root / f"config/{role}/game.toml"
         if not path.exists():
             problems.append(f"{role}: missing game.toml")

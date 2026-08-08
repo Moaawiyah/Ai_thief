@@ -29,6 +29,7 @@ turn_timeout_seconds = 1
     (root / "game.json").write_text(
         json.dumps(
             {
+                "schema_version": "1.3",
                 "board_and_agents": {"grid_size": 7, "thief_start": [3, 3], "cop_start": [0, 0]},
                 "movement_and_barriers": {
                     "max_moves": max_moves,

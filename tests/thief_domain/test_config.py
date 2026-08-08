@@ -24,6 +24,7 @@ def write_config(root):
     (root / "game.json").write_text(
         json.dumps(
             {
+                "schema_version": "1.3",
                 "board_and_agents": {
                     "grid_size": 7,
                     "thief_start": [3, 3],

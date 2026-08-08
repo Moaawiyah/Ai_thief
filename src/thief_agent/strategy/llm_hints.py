@@ -43,6 +43,16 @@ class LlmTrashTalk(TrashTalk):
 
     uses_llm = True
 
+    @property
+    def tokens_consumed(self) -> int:
+        """Expose usage from a metered asker when available."""
+        return int(getattr(self._ask, "tokens_consumed", 0))
+
+    @property
+    def last_usage(self) -> dict:
+        """Expose the latest model usage for the runtime audit record."""
+        return dict(getattr(self._ask, "last_usage", {}))
+
     def __init__(self, ask, rng=None, every_n_steps=1, model="", max_words=15, min_confidence=0.55):
         super().__init__(rng, max_words)
         self._ask = ask

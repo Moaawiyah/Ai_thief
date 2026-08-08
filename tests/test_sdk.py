@@ -34,6 +34,27 @@ def test_sdk_runtime_is_lazy_but_stable(tmp_path):
     assert agent.runtime is agent.runtime
 
 
+def test_sdk_restart_drops_the_runtime_so_the_next_access_builds_a_fresh_one(tmp_path):
+    transport = QueueTransport(queue.Queue(), queue.Queue())
+    agent = ThiefAgentSDK(config=config(tmp_path), transport=transport)
+    first = agent.runtime
+
+    agent.restart()
+
+    assert agent.runtime is not first
+
+
+def test_sdk_restart_reuses_the_same_transport_rather_than_reconnecting(tmp_path):
+    """Rebinding the port the old server still holds would fail outright."""
+    transport = QueueTransport(queue.Queue(), queue.Queue())
+    agent = ThiefAgentSDK(config=config(tmp_path), transport=transport)
+
+    agent.restart()
+
+    assert agent.connect() is transport
+    assert agent.runtime.transport is transport
+
+
 def test_sdk_saves_and_loads_the_full_summary(tmp_path):
     transport = QueueTransport(queue.Queue(), queue.Queue())
     agent = ThiefAgentSDK(config=config(tmp_path), transport=transport)

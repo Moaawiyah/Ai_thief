@@ -48,7 +48,7 @@ def test_excluding_every_cell_recovers_uniform_prior():
 def test_power_and_leak_default_to_the_shipped_values():
     belief = BeliefGrid.from_config({"board_size": 7}, {})
 
-    assert belief._smell_power == 2.0
+    assert belief._smell_power == 3.0
     assert belief._leak == 0.03
 
 

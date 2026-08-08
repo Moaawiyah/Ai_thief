@@ -173,10 +173,10 @@ Project requirements include:
 - minimum 85% test coverage;
 - zero Ruff violations;
 - maximum 150 lines of code per Python source or test file;
-- modular architecture;
+- SDK  architecture;
 - no hardcoded secrets;
 - meaningful tests for new functionality.
-
+- ensure OOP structure.
 Keep game/domain logic independent from networking, GUI, and LLM code.
 
 Do not use an LLM as the authoritative game-rule or movement engine.

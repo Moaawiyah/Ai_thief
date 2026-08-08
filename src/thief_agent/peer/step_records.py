@@ -61,6 +61,8 @@ def sealed_step_record(
             "fallback_reason": decision.fallback_reason,
         },
         "model": usage.get("model", "unknown"),
+        "tokens_input": usage.get("in", 0),
+        "tokens_output": usage.get("out", 0),
         "tokens_step": usage.get("total", 0),
         "tokens_total": tokens_total,
         "response_seconds": decision.response_seconds,
@@ -100,14 +102,22 @@ def build_turn_message(
 
 
 def build_terminal_message(record: dict, step: int, claim_response: dict | None) -> TurnMessage:
-    """Notify the opponent after a claim/barrier ends the game, reusing the
-    already-sealed final commit rather than opening a fresh step."""
+    """Notify the opponent after a claim/barrier ends the game.
+
+    Seals a fresh commit rather than reusing the last turn's: the opponent's
+    replay guard is keyed on commit, so an identical commit here reads as a
+    duplicate of the turn already sent, and the notification -- carrying the
+    capture confirmation -- gets silently dropped instead of ending the match
+    on both sides. This message is never added to `records`, so a fresh nonce
+    costs nothing at audit time.
+    """
+    sealed = CommitReveal.seal({"step": step, "kind": "terminal", "prior_commit": record["commit"]})
     return TurnMessage(
         step=step,
         sender="thief",
         hint="You caught me.",
         smell_grid={},
-        commit=record["commit"],
+        commit=sealed["commit"],
         timestamp=_now_iso(),
         claim_response=claim_response,
     )

@@ -31,9 +31,29 @@ def apply_event(window, event: dict) -> None:
     if kind == "series_restart":
         window.set_turn(False, f"SERIES RESTARTED (attempt {event.get('attempt')})")
         return
+    if kind == "series_complete":
+        result = event.get("result") or {}
+        winner = result.get("winner_group") or "tie"
+        window.set_label(
+            "game", f"{event.get('num_sub_games', 0)} / {event.get('num_sub_games', 0)} complete"
+        )
+        window.set_label("status", f"SERIES COMPLETE - winner {winner}")
+        window.set_turn(False, f"SERIES COMPLETE: {winner.upper()}")
+        return
+    if kind == "sub_game_over":
+        summary = event.get("summary") or {}
+        number = event.get("sub_game_number", summary.get("sub_game_number", 1))
+        window.set_label("game", f"{number} complete")
+        window.set_label(
+            "status", f"Sub-game {number}: {summary.get('result')} - {summary.get('winner')}"
+        )
+        window.set_turn(False, f"SUB-GAME {number} COMPLETE - starting next...")
+        return
     if "view" in event:
         window.render(event["view"])
     if kind == "negotiated":
+        if event.get("sub_game_number") is not None:
+            window.set_label("game", f"{event['sub_game_number']} in progress")
         window.set_label("status", "Terms agreed and signature verified (SHA-256)")
         window.set_label(
             "hint_in", f"opponent: {(event.get('peer') or {}).get('group_id', 'unknown')}"

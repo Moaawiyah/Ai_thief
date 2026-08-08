@@ -31,6 +31,7 @@ class ThiefRuntime:
         controls=None,
         sub_game_number: int = 1,
         link=None,
+        llm=None,
     ):
         validate_config(config)
         self.config = config
@@ -46,7 +47,14 @@ class ThiefRuntime:
             survival_threshold=config.get("rules.survival_threshold"),
         )
         self.brain = brain or ThiefBrain()
-        self.hint_writer = hint_writer or resolve_hint_writer(config)
+        self.llm = llm
+        gatekeeper = getattr(self.transport, "gatekeeper", None)
+        hint_gatekeeper = gatekeeper
+        if hint_writer is None and str(config.get("trash_talk.provider", "template")).lower() == "ollama":
+            from thief_agent.shared.gatekeeper import ApiGatekeeper
+
+            hint_gatekeeper = ApiGatekeeper(config, "ollama")
+        self.hint_writer = hint_writer or resolve_hint_writer(config, gatekeeper=hint_gatekeeper)
         self.listener = listener
         self.controls = controls or GameControls()
         self.handler = TurnHandler(self.state, self.belief, self.rules)
@@ -79,12 +87,15 @@ class ThiefRuntime:
             self.config.get("network.host", "127.0.0.1"),
             self.config.get("network.my_port"),
         )
+        from thief_agent.shared.gatekeeper import ApiGatekeeper
+
         return McpTransport(
             self.config.get("network.opponent_url"),
             inboxes,
-            connect_timeout=self.config.get("network.watchdog_timeout_seconds", 60),
-            reply_timeout=self.config.get("network.response_timeout_seconds", 30),
+            connect_timeout=self.config.require("network.watchdog_timeout_seconds"),
+            reply_timeout=self.config.require("network.response_timeout_seconds"),
             retry_interval=self.config.get("network.retry_interval_seconds", 0.25),
+            gatekeeper=ApiGatekeeper(self.config, "mcp"),
         )
 
     def run(self) -> dict:
@@ -131,7 +142,9 @@ class ThiefRuntime:
 
     def _notify(self, event: dict) -> None:
         if self.listener is not None:
-            self.listener({**event, "view": summary.snapshot(self)})
+            self.listener(
+                {**event, "sub_game_number": self.sub_game_number, "view": summary.snapshot(self)}
+            )
 
     def _send_terminal(self, claim_response: dict | None) -> None:
         if not self.records:

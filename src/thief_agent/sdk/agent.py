@@ -15,39 +15,8 @@ from thief_agent.infra.mcp_server import start_peer_server
 from thief_agent.peer.controls import GameControls
 from thief_agent.peer.runtime import ThiefRuntime
 from thief_agent.sdk.options import MatchOptions
+from thief_agent.sdk.provider_factory import build_llm
 from thief_agent.shared.config import ConfigManager
-
-DEFAULT_CONNECT_TIMEOUT = 60.0
-DEFAULT_REPLY_TIMEOUT = 30.0
-
-
-class StubLlm:
-    """Unparseable on purpose: forces the deterministic fallback policy."""
-
-    last_usage = {"model": "stub", "in": 0, "out": 0, "total": 0}
-    tokens_consumed = 0
-
-    def send(self, prompt: str, timeout=None, schema=None) -> str:
-        return "stub reply - no structured move here"
-
-
-class GatedLlm:
-    """A structured LLM provider routed through the API gatekeeper."""
-
-    def __init__(self, provider, gatekeeper):
-        self._provider = provider
-        self._gatekeeper = gatekeeper
-
-    @property
-    def last_usage(self) -> dict:
-        return self._provider.last_usage
-
-    @property
-    def tokens_consumed(self) -> int:
-        return self._provider.tokens_consumed
-
-    def send(self, prompt: str, timeout=None, schema=None) -> str:
-        return self._gatekeeper.execute(self._provider.send, prompt, timeout=timeout, schema=schema)
 
 
 class ThiefAgentSDK:
@@ -93,18 +62,22 @@ class ThiefAgentSDK:
         """Open the Thief mailbox and outbound transport once."""
         if self._transport is None:
             inboxes = start_peer_server("thief", self.host, self.port)
-            self._transport = McpTransport(self.opponent_url, inboxes, **self.transport_timeouts())
+            from thief_agent.shared.gatekeeper import ApiGatekeeper
+
+            gatekeeper = ApiGatekeeper(self.config, "mcp")
+            self._transport = McpTransport(
+                self.opponent_url,
+                inboxes,
+                gatekeeper=gatekeeper,
+                **self.transport_timeouts(),
+            )
         return self._transport
 
     def transport_timeouts(self) -> dict[str, float]:
         """Resolve transport deadlines from private/shared config with safe fallbacks."""
         return {
-            "connect_timeout": float(
-                self.config.get("network.watchdog_timeout_seconds") or DEFAULT_CONNECT_TIMEOUT
-            ),
-            "reply_timeout": float(
-                self.config.get("network.response_timeout_seconds") or DEFAULT_REPLY_TIMEOUT
-            ),
+            "connect_timeout": float(self.config.require("network.watchdog_timeout_seconds")),
+            "reply_timeout": float(self.config.require("network.response_timeout_seconds")),
         }
 
     @property
@@ -124,67 +97,21 @@ class ThiefAgentSDK:
         """Play one configured sub-game and return the complete summary."""
         return self.runtime.run()
 
+    def restart(self) -> None:
+        """Drop the finished/abandoned runtime so the next play() builds a
+        fresh one. Same transport and port, reused -- rebinding it would race
+        the port the old one still holds."""
+        self._runtime = None
+
     def _build_llm(self, stub: bool = False):
-        """Resolve the movement-tactics LLM (independent of the hint-writer's own
-        provider): template/stub by default, or a gatekeeper-wrapped provider."""
-        provider_name = str(self.config.get("llm.provider", "template")).lower()
-        if stub or provider_name == "template":
-            return StubLlm()
-        from thief_agent.shared.gatekeeper import ApiGatekeeper
-
-        if provider_name == "ollama":
-            from thief_agent.infra.ollama_provider import OllamaLlmProvider
-
-            return GatedLlm(OllamaLlmProvider(self.config), ApiGatekeeper(self.config, "ollama"))
-        if provider_name not in {"claude", "claude_cli"}:
-            raise ConfigError("llm.provider must be template, ollama, or claude_cli")
-        from thief_agent.infra.llm_provider import ClaudeCliProvider
-
-        return GatedLlm(ClaudeCliProvider(self.config), ApiGatekeeper(self.config, "claude"))
+        """Resolve the movement-tactics provider through the shared factory."""
+        return build_llm(self.config, stub)
 
     def play_series(self, stub_llm: bool = False) -> dict:
-        """Play the whole configured series (game.num_games sub-games), write the
-        four standardized JSON artifacts, keep the legacy Hebrew log, and (if
-        enabled) email the result JSON. Sharing this SDK's transport/controls
-        across every sub-game."""
-        from thief_agent.infra.email_sender import EmailSender
-        from thief_agent.peer.sealing import terms_from_config, validate_agreement
-        from thief_agent.report.emit import emit_series
-        from thief_agent.report.report_writer import build_report
-        from thief_agent.sdk.series import run_series
-        from thief_agent.strategy import resolve_brain
+        """Play the configured series and emit its audit/report artifacts."""
+        from thief_agent.sdk.series_runner import play_series
 
-        validate_agreement(self.config)
-        self._llm = self._build_llm(stub_llm)
-        brain = self._brain or resolve_brain(self.config, self._llm)
-        series = run_series(
-            self.config,
-            self.connect(),
-            brain=brain,
-            listener=self.listener,
-            controls=self.controls or GameControls(),
-        )
-
-        logs_dir = self._workdir / self.config.get("paths.logs_dir", "logs")
-        result_json = emit_series(self.config, logs_dir, series)
-
-        last = series.summaries[-1]
-        report = build_report(last, self.config, terms=terms_from_config(self.config))
-        self._save_log(last, report)  # legacy Hebrew log (back-compat)
-
-        winner = result_json["final_result"].get("winner_group") or last["winner"]
-        subject = f"Police-Thief series result: winner {winner} (reported by thief)"
-        email = EmailSender(self.config).send_report(result_json, subject)
-        group_id = series.own_identity.get("group_id", "unknown-group")
-        result_path = logs_dir / group_id / f"result_{series.game_id}.json"
-        return {
-            "summary": last,
-            "report": report,
-            "email": email,
-            "summaries": series.summaries,
-            "result": result_json,
-            "log_path": str(result_path),
-        }
+        return play_series(self, stub_llm)
 
     def _save_log(self, summary: dict, report: dict) -> Path:
         logs_dir = self._workdir / self.config.get("paths.logs_dir", "logs")

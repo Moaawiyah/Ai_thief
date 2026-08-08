@@ -8,10 +8,12 @@ not be blurred away by the next predict step.
 """
 
 from thief_agent.constants import Cell
+from thief_agent.domain.grid_utils import in_bounds, parse_cell
 
 DEFAULT_SMELL_TRUST = 4.0
-# Convexity of intensity->likelihood -- starves a stale trail cell harder than a fresh one.
-DEFAULT_SMELL_POWER = 2.0
+# Convexity of intensity->likelihood -- above 1, a cell faint relative to THIS reading's own
+# peak is starved harder than the peak itself, regardless of the packet's absolute scale.
+DEFAULT_SMELL_POWER = 3.0
 # Sliver of the posterior re-mixed to uniform each turn -- readings are a trail, not independent.
 DEFAULT_LEAK = 0.03
 _EPSILON = 1e-9
@@ -47,12 +49,21 @@ class BeliefGrid:
         return cls(terms["board_size"], trust, power, leak)
 
     def observe_smell(self, cells: dict | None) -> None:
-        """``1 + trust * intensity**power`` per scented cell, normalize, then leak."""
+        """``1 + trust * reading**power`` per scented cell, where ``reading`` is
+        that cell's intensity relative to THIS reading's own peak, not an
+        absolute value -- a field that has broadly faded still has a relatively
+        freshest cell, and that is the one evidence should concentrate on.
+        Normalize, then leak. Malformed entries are skipped, not fatal."""
+        parsed: dict[Cell, float] = {}
         for key, value in (cells or {}).items():
-            cell = self._parse(key)
+            cell = parse_cell(key, self.size)
             if cell is not None and isinstance(value, int | float):
-                row, column = cell
-                boost = 1.0 + self._smell_trust * float(value) ** self._smell_power
+                parsed[cell] = min(1.0, max(0.0, float(value)))  # negative here can turn complex
+        peak = max(parsed.values(), default=0.0)
+        if peak > 0.0:
+            for (row, column), intensity in parsed.items():
+                reading = intensity / peak
+                boost = 1.0 + self._smell_trust * reading**self._smell_power
                 self._probabilities[row][column] *= boost
         self._normalize()
         self._leak_toward_uniform()
@@ -68,7 +79,7 @@ class BeliefGrid:
                 targets = [
                     (row + d_row, column + d_column)
                     for d_row, d_column in self._OFFSETS
-                    if self._in_bounds((row + d_row, column + d_column))
+                    if in_bounds((row + d_row, column + d_column), self.size)
                 ]
                 share = mass / len(targets)
                 for target_row, target_column in targets:
@@ -79,27 +90,27 @@ class BeliefGrid:
     def observe_likelihoods(self, evidence: dict[Cell, float]) -> None:
         """Apply soft evidence from a parsed verbal hint and renormalize."""
         for (row, column), likelihood in evidence.items():
-            if self._in_bounds((row, column)):
+            if in_bounds((row, column), self.size):
                 self._probabilities[row][column] *= max(_EPSILON, float(likelihood))
         self._normalize()
 
     def scale(self, cells, factor: float) -> None:
         """Reweight selected cells for evidence that is not scent."""
         for cell in cells:
-            if self._in_bounds(cell):
+            if in_bounds(cell, self.size):
                 self._probabilities[cell[0]][cell[1]] *= factor
         self._normalize()
 
     def observe(self, cell: Cell, weight: float = 1.0) -> None:
         """Compatibility helper for direct local observations and old callers."""
-        if not self._in_bounds(cell):
+        if not in_bounds(cell, self.size):
             raise ValueError(f"Observed cell {cell} is off the belief grid")
         self._probabilities[cell[0]][cell[1]] *= max(0.0, weight)
         self._normalize()
 
     def exclude(self, cell: Cell) -> None:
         """Rule out a cell after a barrier or other observation excludes it."""
-        if self._in_bounds(cell):
+        if in_bounds(cell, self.size):
             self._probabilities[cell[0]][cell[1]] = 0.0
             self._normalize()
 
@@ -136,14 +147,3 @@ class BeliefGrid:
             [(1.0 - self._leak) * value + self._leak * probability for value in row]
             for row in self._probabilities
         ]
-
-    def _in_bounds(self, cell: Cell) -> bool:
-        return 0 <= cell[0] < self.size and 0 <= cell[1] < self.size
-
-    def _parse(self, key: str) -> Cell | None:
-        try:
-            row_text, column_text = str(key).split(",")
-            cell = (int(row_text), int(column_text))
-        except ValueError:
-            return None
-        return cell if self._in_bounds(cell) else None
