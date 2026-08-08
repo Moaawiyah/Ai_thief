@@ -7,6 +7,7 @@ clock keeps tests deterministic and instant.
 import threading
 import time as _time
 from collections import deque
+from contextlib import suppress
 
 from thief_agent.exceptions import RateLimitError
 
@@ -30,42 +31,47 @@ class RateLimiter:
         self._timeout = queue_cfg["timeout_seconds"]
         self._clock = clock or _RealClock()
         self._grants: deque[float] = deque()  # timestamps of recent grants
-        self._waiting = 0
+        self._waiting: deque[int] = deque()
+        self._next_ticket = 0
         self._lock = threading.Lock()
 
     @property
     def queue_depth(self) -> int:
         """How many callers are currently queued waiting for a slot."""
-        return self._waiting
+        with self._lock:
+            return len(self._waiting)
 
     def _prune(self, now: float) -> None:
         while self._grants and now - self._grants[0] >= WINDOW_SECONDS:
             self._grants.popleft()
 
-    def _try_grant(self) -> bool:
-        with self._lock:
-            now = self._clock.time()
-            self._prune(now)
-            if len(self._grants) < self._rpm:
-                self._grants.append(now)
-                return True
-            return False
+    def _try_grant_locked(self) -> bool:
+        now = self._clock.time()
+        self._prune(now)
+        if len(self._grants) < self._rpm:
+            self._grants.append(now)
+            return True
+        return False
 
     def acquire(self) -> None:
         """Block until a slot frees; raise RateLimitError on overflow/timeout."""
-        if self._try_grant():
-            return
         with self._lock:
-            if self._waiting >= self._max_depth:
+            if not self._waiting and self._try_grant_locked():
+                return
+            if len(self._waiting) >= self._max_depth:
                 raise RateLimitError(f"Rate-limit queue full (max_depth={self._max_depth})")
-            self._waiting += 1
+            ticket = self._next_ticket
+            self._next_ticket += 1
+            self._waiting.append(ticket)
         try:
             deadline = self._clock.time() + self._timeout
             while self._clock.time() < deadline:
                 self._clock.sleep(self._drain_interval)
-                if self._try_grant():
-                    return
+                with self._lock:
+                    if self._waiting and self._waiting[0] == ticket and self._try_grant_locked():
+                        self._waiting.popleft()
+                        return
             raise RateLimitError(f"Timed out after {self._timeout}s waiting for a rate slot")
         finally:
-            with self._lock:
-                self._waiting -= 1
+            with self._lock, suppress(ValueError):
+                self._waiting.remove(ticket)

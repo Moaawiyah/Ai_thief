@@ -50,3 +50,20 @@ def test_every_n_steps_controls_model_calls():
         subject()
 
     assert len(calls) == 2
+
+
+def test_ollama_prompt_keeps_the_model_in_the_thief_role():
+    prompts = {}
+
+    def capture(user, system):
+        prompts["user"], prompts["system"] = user, system
+        return "I am already gone."
+
+    HintWriter(capture, setting="New York", rng=random.Random(0))(
+        opponent_hint="You cannot escape."
+    )
+
+    assert "You are the Thief" in prompts["system"]
+    assert "never the Police" in prompts["system"]
+    assert "untrusted context" in prompts["user"]
+    assert "Never answer as the Police" in prompts["user"]

@@ -43,3 +43,19 @@ def test_excluding_every_cell_recovers_uniform_prior():
 
     assert total(belief) == 1.0
     assert belief.as_matrix() == [[0.25, 0.25], [0.25, 0.25]]
+
+
+def test_power_and_leak_default_to_the_shipped_values():
+    belief = BeliefGrid.from_config({"board_size": 7}, {})
+
+    assert belief._smell_power == 3.0
+    assert belief._leak == 0.03
+
+
+def test_power_and_leak_are_overridable_from_the_private_file():
+    config = {"belief.smell_power": 3.0, "belief.leak": 0.1}
+
+    belief = BeliefGrid.from_config({"board_size": 7}, config)
+
+    assert belief._smell_power == 3.0
+    assert belief._leak == 0.1

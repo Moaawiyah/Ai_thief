@@ -21,6 +21,9 @@ config/thief/*.local.toml
 
 # Secrets / credentials
 .env
+credentials.json
+*.key
+*.pem
 *.credentials.json
 *token*.json
 

@@ -55,11 +55,16 @@ class PeerInboxes:
         return {"ok": True, "message_id": message_id, "acknowledged": True}
 
     def accept_reveal(self, message: dict) -> dict:
-        """Queue a fresh reveal exactly once after validating its commitment.
+        """Queue a fresh reveal exactly once, checking it against a prior
+        commitment when one was made.
 
-        Tolerant of peers that skip the commit phase entirely (message_id is
-        empty/absent): those turns are queued directly, same as before this
-        two-phase handshake existed, so older or simplified opponents still work.
+        Tolerant of peers that skip the commit phase entirely -- whether
+        message_id is empty/absent, or set but never preceded by a
+        `commit_turn` call (the Police peer's client sends this way: it has no
+        `commit_turn` tool to call). A message_id is still deduped against
+        replay either way, so idempotency holds even without the two-phase
+        handshake; a genuine prior commitment, when there is one, is still
+        checked in full.
         """
         message_id = str(message.get("message_id", ""))
         if not message_id:
@@ -69,17 +74,16 @@ class PeerInboxes:
             if message_id in self.delivered_ids:
                 return {"ok": True, "message_id": message_id, "duplicate": True}
             pending = self.pending_commits.get(message_id)
-            if pending is None:
-                raise SimulationError("reveal arrived without a prior commitment")
-            if pending.get("commit") != message.get("commit"):
-                raise SimulationError("reveal commitment does not match acknowledged hash")
-            envelope = ("schema_version", "game_id", "sub_game_number", "step", "sender")
-            if any(key in pending and pending[key] != message.get(key) for key in envelope):
-                raise SimulationError("reveal envelope does not match acknowledged commitment")
+            if pending is not None:
+                if pending.get("commit") != message.get("commit"):
+                    raise SimulationError("reveal commitment does not match acknowledged hash")
+                envelope = ("schema_version", "game_id", "sub_game_number", "step", "sender")
+                if any(key in pending and pending[key] != message.get(key) for key in envelope):
+                    raise SimulationError("reveal envelope does not match acknowledged commitment")
+                self.pending_commits.pop(message_id, None)
             expiry = float(message.get("expires_at_epoch", 0.0) or 0.0)
             if expiry and time.time() > expiry:
                 raise SimulationError("reveal expired before delivery")
-            self.pending_commits.pop(message_id, None)
             self.delivered_ids.add(message_id)
         self.turns.put(message)
         return {"ok": True, "message_id": message_id, "revealed": True}

@@ -59,5 +59,6 @@ with `https://github.com/Moaawiyah/police-agent.git`.
 
 ## Step 6 — Follow-up
 
-- [ ] Add multi-game series aggregation and role alternation
-- [ ] Add reporting artifacts and multi-game replay integration
+- [x] Add Thief-side multi-game series orchestration and aggregation; role
+      alternation remains owned by the separate Police peer
+- [x] Add reporting artifacts and multi-game result emission

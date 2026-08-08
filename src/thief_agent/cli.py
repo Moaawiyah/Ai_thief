@@ -77,13 +77,13 @@ def main(argv: list[str] | None = None) -> None:
             outcome = ThiefAgentSDK(config=config).play_series(stub_llm=args.stub_llm)
         except SimulationError as exc:
             parser.error(str(exc))
-        summary = outcome["summary"]
+        final = outcome["series_result"]
         print(
             json.dumps(
                 {
-                    "result": summary["result"],
-                    "winner": summary["winner"],
-                    "steps": summary["steps"],
+                    "result": final,
+                    "winner": final.get("winner_group"),
+                    "sub_games": outcome["result"]["num_sub_games"],
                     "log": outcome["log_path"],
                     "email": outcome["email"],
                 },

@@ -1,9 +1,16 @@
 """Synchronous peer transport backed by the opponent's FastMCP server.
 
-Implements the two-phase commit/reveal turn protocol (`commit_turn` then
-`receive_turn`) whenever a message carries a `message_id`; older or simplified
-opponents that omit `message_id` still work over the single-phase `receive_turn`
-path (the server tolerates both — see `PeerInboxes.accept_reveal`).
+Turns go over the single `receive_turn` call, same as the Police peer's own
+client: the Police server only ever exposes `negotiate` / `receive_turn` /
+`submit_audit` / `receive_control`, never a separate `commit_turn` tool, so
+calling one first against a real Police opponent burned the whole retry
+budget on an unknown-tool failure and reported it as the opponent being
+unreachable. Commit-reveal data (`commit`, `message_id`, `prior_commit`,
+`move_reveal`, `expires_at_epoch`) still rides inside the TurnMessage payload
+itself and is still checked end to end at the audit; only the extra
+transport-level `commit_turn` round-trip is gone. This peer's own server still
+exposes `commit_turn` for an opponent that wants the stricter two-phase path —
+see `PeerInboxes.accept_reveal`, which accepts either.
 """
 
 import asyncio
@@ -13,20 +20,8 @@ import time
 
 from fastmcp import Client
 
-from thief_agent.exceptions import SimulationError
+from thief_agent.exceptions import ProviderError, SimulationError
 from thief_agent.infra.mcp_server import PeerInboxes
-
-_COMMITMENT_FIELDS = (
-    "schema_version",
-    "game_id",
-    "sub_game_number",
-    "message_id",
-    "step",
-    "sender",
-    "commit",
-    "timestamp",
-    "expires_at_epoch",
-)
 
 
 class McpTransport:
@@ -40,6 +35,7 @@ class McpTransport:
         retry_interval: float = 0.25,
         reply_timeout: float | None = None,
         control_send_timeout: float = 2.0,
+        gatekeeper=None,
     ) -> None:
         self.opponent_url = opponent_url
         self.inboxes = inboxes
@@ -47,6 +43,7 @@ class McpTransport:
         self.retry_interval = retry_interval
         self.reply_timeout = reply_timeout or connect_timeout
         self.control_send_timeout = control_send_timeout
+        self.gatekeeper = gatekeeper
 
     def _call(self, tool: str, argument: dict) -> None:
         async def invoke() -> None:
@@ -55,13 +52,19 @@ class McpTransport:
                 arguments = {} if tool == "health" else {key: argument}
                 await client.call_tool(tool, arguments)
 
-        asyncio.run(invoke())
+        try:
+            asyncio.run(invoke())
+        except Exception as exc:
+            raise ProviderError(f"FastMCP {tool} call failed: {exc}") from exc
 
     def _send(self, tool: str, argument: dict, timeout: float | None = None) -> None:
         deadline = time.monotonic() + (timeout if timeout is not None else self.connect_timeout)
         while True:
             try:
-                self._call(tool, argument)
+                if self.gatekeeper is None:
+                    self._call(tool, argument)
+                else:
+                    self.gatekeeper.execute(self._call, tool, argument)
                 return
             except Exception as exc:
                 if time.monotonic() >= deadline:
@@ -85,10 +88,7 @@ class McpTransport:
         return self._poll(self.inboxes.agreements, timeout)
 
     def send_turn(self, message: dict) -> None:
-        """Reveal one turn, committing first when the message carries a message_id."""
-        if message.get("message_id"):
-            commitment = {key: message[key] for key in _COMMITMENT_FIELDS if key in message}
-            self._send("commit_turn", commitment)
+        """Reveal one turn over the single call every opponent implements."""
         self._send("receive_turn", message)
 
     def poll_turn(self, timeout: float | None = None) -> dict | None:

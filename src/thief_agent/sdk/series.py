@@ -2,14 +2,14 @@
 
 The transport (and thus this peer's MCP server) is built ONCE by the caller and
 reused across sub-games — it is never torn down between them. Each sub-game gets
-a fresh ThiefRuntime (fresh state/belief/scent/commit-chain). Thief always plays
-thief (no role alternation — that's a Police-only concept since only Police ever
-plays both sides across a series).
+a fresh ThiefRuntime (fresh state/belief/scent/commit-chain). This repository's
+peer remains Thief in every sub-game; a role-alternating league coordinator and
+the Police peer own the other role and are deliberately outside this boundary.
 """
 
 from dataclasses import dataclass
 
-from thief_agent.exceptions import RestartSeries
+from thief_agent.exceptions import ConfigError, RestartSeries
 from thief_agent.peer.control_link import ControlLink
 from thief_agent.peer.controls import GameControls
 from thief_agent.peer.runtime import ThiefRuntime
@@ -18,6 +18,13 @@ from thief_agent.peer.sealing import identity_from_config
 __all__ = ["SeriesResult", "run_series"]
 
 MAX_RESTARTS = 10  # backstop so a restart storm can never loop forever
+
+
+def _series_count(config) -> int:
+    value = config.get("game.num_games", 1)
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 6:
+        raise ConfigError("game.num_games must be an integer from 1 through 6")
+    return value
 
 
 @dataclass
@@ -31,9 +38,9 @@ class SeriesResult:
     game_uid: str | None
 
 
-def _play_all(config, brain, hint_writer, transport, listener, controls, link) -> SeriesResult:
+def _play_all(config, brain, hint_writer, transport, listener, controls, link, llm) -> SeriesResult:
     """One full pass over the sub-games (the whole series) with a shared ControlLink."""
-    num_games = config.get("game.num_games", 1)
+    num_games = _series_count(config)
     own_identity = identity_from_config(config)
     summaries: list[dict] = []
     peer_identity: dict = {}
@@ -48,6 +55,7 @@ def _play_all(config, brain, hint_writer, transport, listener, controls, link) -
             controls=controls,
             sub_game_number=sub_game_number,
             link=link,
+            llm=llm,
         )
         summaries.append(runtime.run())
         peer_identity = runtime.peer_identity or peer_identity
@@ -56,7 +64,7 @@ def _play_all(config, brain, hint_writer, transport, listener, controls, link) -
 
 
 def run_series(
-    config, transport, brain=None, hint_writer=None, listener=None, controls=None
+    config, transport, brain=None, hint_writer=None, listener=None, controls=None, llm=None
 ) -> SeriesResult:
     """Play the whole series; a control-channel RestartSeries restarts it from
     sub-game 1 (the ControlLink is shared so the enable state survives a restart)."""
@@ -65,7 +73,7 @@ def run_series(
     attempt = 0
     while True:
         try:
-            return _play_all(config, brain, hint_writer, transport, listener, controls, link)
+            return _play_all(config, brain, hint_writer, transport, listener, controls, link, llm)
         except RestartSeries:
             attempt += 1
             # Clear any stale turn/control messages from the aborted sub-game so the

@@ -39,24 +39,28 @@ class ApiGatekeeper:
         self._calls_today = 0
         self._consecutive_failures = 0
         self._circuit_opened_at = 0.0
+        self._state_lock = threading.Lock()
 
     def execute(self, api_call: Callable, *args: Any, **kwargs: Any) -> Any:
         """Run an external call under rate control with transient-error retry."""
         last_error: ProviderError | None = None
-        for attempt in range(1, self._max_retries + 1):
+        for attempt in range(1, self._max_retries + 2):
             self._check_guards()
             self._limiter.acquire()
-            self._calls_total += 1
-            self._calls_today += 1
+            with self._state_lock:
+                self._calls_total += 1
+                self._calls_today += 1
             try:
                 with self._concurrency:
                     result = api_call(*args, **kwargs)
-                self._consecutive_failures = 0
+                with self._state_lock:
+                    self._consecutive_failures = 0
                 logger.debug("gatekeeper[%s] call ok (attempt %d)", self._service, attempt)
                 return result
             except ProviderError as exc:
-                self._failures_total += 1
-                self._consecutive_failures += 1
+                with self._state_lock:
+                    self._failures_total += 1
+                    self._consecutive_failures += 1
                 last_error = exc
                 logger.warning(
                     "gatekeeper[%s] attempt %d/%d failed: %s",
@@ -65,9 +69,10 @@ class ApiGatekeeper:
                     self._max_retries,
                     exc,
                 )
-                if self._consecutive_failures >= self._circuit_threshold:
-                    self._circuit_opened_at = time.monotonic()
-                if attempt < self._max_retries and self._retry_after:
+                with self._state_lock:
+                    if self._consecutive_failures >= self._circuit_threshold:
+                        self._circuit_opened_at = time.monotonic()
+                if attempt <= self._max_retries and self._retry_after:
                     time.sleep(self._retry_after)
         assert last_error is not None
         raise last_error
@@ -75,24 +80,26 @@ class ApiGatekeeper:
     def _check_guards(self) -> None:
         """Enforce the daily quota and circuit-breaker cooldown."""
         today = datetime.now(UTC).date()
-        if today != self._day:
-            self._day, self._calls_today = today, 0
-        if self._calls_today >= self._daily_quota:
-            raise RateLimitError(f"daily quota exhausted for {self._service}")
-        if self._circuit_opened_at:
-            elapsed = time.monotonic() - self._circuit_opened_at
-            if elapsed < self._circuit_cooldown:
-                raise RateLimitError(f"circuit open for {self._service}")
-            self._circuit_opened_at = 0.0
-            self._consecutive_failures = 0
+        with self._state_lock:
+            if today != self._day:
+                self._day, self._calls_today = today, 0
+            if self._calls_today >= self._daily_quota:
+                raise RateLimitError(f"daily quota exhausted for {self._service}")
+            if self._circuit_opened_at:
+                elapsed = time.monotonic() - self._circuit_opened_at
+                if elapsed < self._circuit_cooldown:
+                    raise RateLimitError(f"circuit open for {self._service}")
+                self._circuit_opened_at = 0.0
+                self._consecutive_failures = 0
 
     def get_queue_status(self) -> dict:
         """Current queue depth and processing stats."""
-        return {
-            "service": self._service,
-            "queue_depth": self._limiter.queue_depth,
-            "calls_total": self._calls_total,
-            "failures_total": self._failures_total,
-            "calls_today": self._calls_today,
-            "circuit_open": bool(self._circuit_opened_at),
-        }
+        with self._state_lock:
+            return {
+                "service": self._service,
+                "queue_depth": self._limiter.queue_depth,
+                "calls_total": self._calls_total,
+                "failures_total": self._failures_total,
+                "calls_today": self._calls_today,
+                "circuit_open": bool(self._circuit_opened_at),
+            }

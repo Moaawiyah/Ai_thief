@@ -32,11 +32,11 @@ run both repositories' test suites.
 
 ## Status
 
-The one-sub-game Thief runtime, reference-compatible protocol, handshake,
-commit-reveal audit, configuration loader, FastMCP transport, full pheromone
-mechanics, Bayesian belief fusion, and public SDK are implemented.
-Series aggregation, reporting, and GUI remain.
-See [`PLAN.md`](PLAN.md) for the build order and [`TODO.md`](TODO.md) for the
+The Thief runtime, reference-compatible protocol, handshake, commit-reveal
+audit, configuration loader, FastMCP transport, full pheromone mechanics,
+Bayesian belief fusion, public SDK, series aggregation, reporting, and GUI are
+implemented. Role alternation remains owned by the separate Police peer.
+See [`PLAN.md`](docs/PLAN.md) for the build order and [`TODO.md`](docs/TODO.md) for the
 current step.
 
 ## Layout

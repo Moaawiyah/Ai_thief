@@ -2,6 +2,9 @@
 
 import asyncio
 
+import pytest
+
+from thief_agent.exceptions import SimulationError
 from thief_agent.infra.mcp_server import PeerInboxes, build_peer_server
 
 
@@ -61,3 +64,39 @@ def test_commit_then_reveal_two_phase_flow():
     asyncio.run(invoke_tools())
     assert inboxes.turns.get_nowait()["move_reveal"] == "N"
     assert inboxes.turns.empty()
+
+
+def test_a_reveal_with_a_message_id_but_no_prior_commit_is_accepted_directly():
+    """The Police peer's client has no `commit_turn` tool to call, so a real
+    match's every turn arrives this way: message_id set, no commitment ever
+    registered. It must be delivered, not rejected as missing one."""
+    inboxes = PeerInboxes()
+
+    ack = inboxes.accept_reveal({"message_id": "mid-2", "commit": "c" * 64, "step": 1})
+
+    assert ack == {"ok": True, "message_id": "mid-2", "revealed": True}
+    assert inboxes.turns.get_nowait()["message_id"] == "mid-2"
+
+
+def test_a_message_id_is_still_deduped_without_a_prior_commit():
+    """Dropping the two-phase requirement must not drop the idempotency it
+    also provided: a resent turn is still recognised as the same one."""
+    inboxes = PeerInboxes()
+    message = {"message_id": "mid-3", "commit": "c" * 64, "step": 1}
+
+    inboxes.accept_reveal(message)
+    duplicate = inboxes.accept_reveal(message)
+
+    assert duplicate == {"ok": True, "message_id": "mid-3", "duplicate": True}
+    assert inboxes.turns.qsize() == 1
+
+
+def test_an_expired_reveal_is_rejected_even_without_a_prior_commit():
+    """Commit-reveal security is unchanged: a stale reveal is still refused,
+    whether or not the sender ever called commit_turn."""
+    inboxes = PeerInboxes()
+
+    with pytest.raises(SimulationError, match="expired"):
+        inboxes.accept_reveal(
+            {"message_id": "mid-4", "commit": "c" * 64, "step": 1, "expires_at_epoch": 1.0}
+        )

@@ -5,6 +5,7 @@ from pathlib import Path
 CODE_VERSION = "1.0.0"
 BOOK_VERSION = "3.0.0"  # shared assignment guidelines-book version this peer targets
 SUPPORTED_CONFIG_VERSIONS = ["1.10"]
+SUPPORTED_SHARED_SCHEMA_VERSIONS = ["1.3"]
 
 # Short suffix shown in the GUI title bar.
 COPYRIGHT_TITLE = "Thief Agent"

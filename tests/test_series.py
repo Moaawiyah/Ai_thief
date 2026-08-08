@@ -3,8 +3,11 @@
 import queue
 import threading
 
+import pytest
+
 from tests.runtime_support import PoliceDouble, QueueTransport
 from tests.test_runtime import config
+from thief_agent.exceptions import ConfigError
 from thief_agent.sdk.series import run_series
 
 
@@ -31,3 +34,10 @@ def test_run_series_plays_every_sub_game_with_a_shared_transport(tmp_path):
     assert [s["result"] for s in series.summaries] == ["survival"] * 3
     assert [s["sub_game_number"] for s in series.summaries] == [1, 2, 3]
     assert series.game_id and series.game_uid
+
+
+def test_run_series_rejects_an_invalid_game_count(tmp_path):
+    cfg = config(tmp_path)
+    cfg.override("game.num_games", 7)
+    with pytest.raises(ConfigError, match="game.num_games"):
+        run_series(cfg, QueueTransport(queue.Queue(), queue.Queue()))

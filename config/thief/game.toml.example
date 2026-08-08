@@ -9,12 +9,19 @@ repos = { cop = "https://github.com/Moaawiyah/police-agent.git", thief = "https:
 
 [network]
 my_port         = 8802                             # MY MCP server port
-opponent_url    = "http://127.0.0.1:8801/mcp"       # the only thing I know about the opponent
+opponent_url    = "https://erased-frayed-clubhouse.ngrok-free.dev/mcp"       # the only thing I know about the opponent
 
 [belief]
 # Private confidence in scent evidence. Physical scent constants remain signed
 # shared terms in game.json; this is only the Thief's fusion tuning.
 smell_trust = 4.0
+
+# smell_power shapes HOW a reading's intensity converts to trust. Each cell is
+# first normalised against the strongest cell in THAT reading (reading =
+# scent / peak), then boosted by 1 + smell_trust * reading**smell_power -- so
+# above 1, a cell that is faint relative to this reading's own peak is starved
+# harder than the peak itself, regardless of the packet's absolute scale.
+# smell_power = 3.0
 
 # [strategy]  -- optional: point at YOUR thief brain subclass (else the shipped heuristic runs)
 # thief_class = "my_team.strategy:MyThiefBrain"
